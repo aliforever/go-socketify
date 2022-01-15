@@ -7,11 +7,11 @@ import (
 )
 
 type Socketify struct {
-	m           sync.Mutex
-	opts        *options
-	server      *http.Server
-	clientsChan chan *Client
-	handlers    map[string]func(message json.RawMessage) error
+	m        sync.Mutex
+	opts     *options
+	server   *http.Server
+	clients  chan *Client
+	handlers map[string]func(message json.RawMessage) error
 }
 
 func New(opts *options) (s *Socketify) {
@@ -35,6 +35,7 @@ func (s *Socketify) HandleUpdate(eventName string, handler func(message json.Raw
 }
 
 func (s *Socketify) Listen() (err error) {
+	s.opts.serveMux.HandleFunc(s.opts.endpoint, s.websocketUpgrade)
 	err = s.server.ListenAndServe()
 	return
 }
@@ -44,5 +45,5 @@ func (s *Socketify) Server() (server *http.Server) {
 }
 
 func (s *Socketify) Clients() chan *Client {
-	return s.clientsChan
+	return s.clients
 }
