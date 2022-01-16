@@ -95,6 +95,10 @@ func (c *Client) Updates() chan *Update {
 	return c.updates
 }
 
+func (c *Client) Server() *Socketify {
+	return c.server
+}
+
 func (c *Client) close() error {
 	if c.server.storage != nil {
 		c.server.storage.RemoveClientByID(c.id)
