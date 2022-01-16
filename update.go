@@ -4,10 +4,10 @@ import "encoding/json"
 
 type Update struct {
 	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
+	Data json.RawMessage `json:"data,omitempty"`
 }
 
 type serverUpdate struct {
 	Type string      `json:"type"`
-	Data interface{} `json:"data"`
+	Data interface{} `json:"data,omitempty"`
 }
