@@ -12,6 +12,7 @@ type options struct {
 	address     string
 	endpoint    string
 	checkOrigin func(r *http.Request) bool
+	logger      Logger
 }
 
 func defaultOptions() *options {
@@ -19,6 +20,7 @@ func defaultOptions() *options {
 		serveMux: http.NewServeMux(),
 		address:  defaultAddress,
 		endpoint: defaultEndpoint,
+		logger:   logger{},
 	}
 }
 
@@ -46,7 +48,12 @@ func (o *options) SetCheckOrigin(checkOriginFn func(r *http.Request) bool) *opti
 	return o
 }
 
-func (o *options) SetCheckOriginIgnore() *options {
+func (o *options) SetLogger(l Logger) *options {
+	o.logger = l
+	return o
+}
+
+func (o *options) IgnoreCheckOrigin() *options {
 	o.checkOrigin = func(r *http.Request) bool {
 		return true
 	}
@@ -62,5 +69,8 @@ func (o *options) fillDefaults() {
 	}
 	if o.serveMux == nil {
 		o.serveMux = http.NewServeMux()
+	}
+	if o.logger == nil {
+		o.logger = logger{}
 	}
 }

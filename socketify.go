@@ -10,6 +10,7 @@ type Socketify struct {
 	upgrade *websocket.Upgrader
 	server  *http.Server
 	clients chan *Client
+	storage *storage
 }
 
 func New(opts *options) (s *Socketify) {
@@ -34,6 +35,11 @@ func New(opts *options) (s *Socketify) {
 		clients: make(chan *Client),
 	}
 	return
+}
+
+func (s *Socketify) WithStorage() *Socketify {
+	s.storage = newStorage()
+	return s
 }
 
 func (s *Socketify) Listen() (err error) {

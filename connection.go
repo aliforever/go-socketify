@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"log"
+	"github.com/teris-io/shortid"
 )
 
 type Client struct {
+	id       string
 	server   *Socketify
 	ws       *websocket.Conn
 	updates  chan *Update
@@ -17,6 +18,7 @@ type Client struct {
 
 func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
 	c = &Client{
+		id:       shortid.MustGenerate(),
 		server:   server,
 		ws:       ws,
 		updates:  make(chan *Update),
@@ -30,10 +32,13 @@ func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
 
 func (c *Client) processWriter() {
 	for update := range c.writer {
-		c.ws.WriteJSON(serverUpdate{
+		err := c.ws.WriteJSON(serverUpdate{
 			Type: update.Type,
 			Data: update.Data,
 		})
+		if err != nil {
+			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("Update Type: %s - Update Data: %s", update.Type, update.Data))
+		}
 	}
 }
 
@@ -45,7 +50,7 @@ func (c *Client) WriteUpdate(updateType string, data interface{}) {
 }
 
 func (c *Client) ProcessUpdates() (err error) {
-	defer c.ws.Close()
+	defer c.close()
 
 	var (
 		message []byte
@@ -53,19 +58,19 @@ func (c *Client) ProcessUpdates() (err error) {
 	for {
 		_, message, err = c.ws.ReadMessage()
 		if err != nil {
-			log.Println("read:", err)
+			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s.", err))
 			return
 		}
 
 		var update *Update
 		jsonErr := json.Unmarshal(message, &update)
 		if jsonErr != nil {
-			fmt.Println(jsonErr)
+			c.server.opts.logger.Error(fmt.Sprintf("Error Unmarshalling Request: %s. Data: %s", jsonErr, message))
 			continue
 		}
 
 		if update.Type == "" {
-			fmt.Println("empty update type")
+			c.server.opts.logger.Error(fmt.Sprintf("Error Due to Empty Update Type. Data: %s", message))
 			continue
 		}
 
@@ -88,4 +93,12 @@ func (c *Client) HandleUpdate(updateType string, handler func(message json.RawMe
 
 func (c *Client) Updates() chan *Update {
 	return c.updates
+}
+
+func (c *Client) close() error {
+	if c.server.storage != nil {
+		c.server.storage.RemoveClientByID(c.id)
+	}
+
+	return c.ws.Close()
 }
