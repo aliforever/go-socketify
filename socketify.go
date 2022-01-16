@@ -52,6 +52,10 @@ func (s *Socketify) Server() (server *http.Server) {
 	return s.server
 }
 
+func (s *Socketify) Storage() *storage {
+	return s.storage
+}
+
 func (s *Socketify) Clients() chan *Client {
 	return s.clients
 }
