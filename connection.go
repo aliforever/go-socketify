@@ -14,6 +14,7 @@ type Client struct {
 	updates  chan *Update
 	writer   chan *serverUpdate
 	handlers map[string]func(message json.RawMessage)
+	closed   chan bool
 }
 
 func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
@@ -24,6 +25,7 @@ func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
 		updates:  make(chan *Update),
 		writer:   make(chan *serverUpdate),
 		handlers: map[string]func(message json.RawMessage){},
+		closed:   make(chan bool),
 	}
 	go c.processWriter()
 
@@ -103,7 +105,15 @@ func (c *Client) Server() *Socketify {
 	return c.server
 }
 
+func (c *Client) CloseChannel() chan bool {
+	return c.closed
+}
+
 func (c *Client) close() error {
+	defer func() {
+		c.closed <- true
+	}()
+
 	if c.server.storage != nil {
 		c.server.storage.RemoveClientByID(c.id)
 	}
