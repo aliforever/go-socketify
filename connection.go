@@ -30,6 +30,10 @@ func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
 	return
 }
 
+func (c *Client) ID() string {
+	return c.id
+}
+
 func (c *Client) processWriter() {
 	for update := range c.writer {
 		err := c.ws.WriteJSON(serverUpdate{
