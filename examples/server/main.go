@@ -14,13 +14,11 @@ func main() {
 		client.HandleUpdate("PING", func(message json.RawMessage) {
 			client.WriteUpdate("PONG", nil)
 		})
-		fmt.Println("new client")
 		go client.ProcessUpdates()
 		go func(c *socketify.Client) {
 			for update := range c.Updates() {
 				fmt.Println(update)
 			}
 		}(client)
-
 	}
 }

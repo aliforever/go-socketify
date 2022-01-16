@@ -28,18 +28,20 @@ func New(opts *options) (s *Socketify) {
 		upgrade.CheckOrigin = opts.checkOrigin
 	}
 
+	var storage *storage
+	if opts.enableStorage {
+		storage = newStorage()
+	}
+
 	s = &Socketify{
 		opts:    opts,
 		server:  &http.Server{Addr: opts.address, Handler: opts.serveMux},
 		upgrade: upgrade,
 		clients: make(chan *Client),
+		storage: storage,
 	}
-	return
-}
 
-func (s *Socketify) WithStorage() *Socketify {
-	s.storage = newStorage()
-	return s
+	return
 }
 
 func (s *Socketify) Listen() (err error) {

@@ -13,7 +13,7 @@ func newStorage() *storage {
 	}
 }
 
-func (s *storage) AddClient(c *Client) {
+func (s *storage) addClient(c *Client) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -27,7 +27,7 @@ func (s *storage) GetClientByID(clientID string) *Client {
 	return s.clients[clientID]
 }
 
-func (s *storage) RemoveClientByID(clientID string) {
+func (s *storage) removeClientByID(clientID string) {
 	s.m.Lock()
 	defer s.m.Unlock()
 

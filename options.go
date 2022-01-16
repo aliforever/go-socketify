@@ -8,11 +8,12 @@ const (
 )
 
 type options struct {
-	serveMux    *http.ServeMux
-	address     string
-	endpoint    string
-	checkOrigin func(r *http.Request) bool
-	logger      Logger
+	serveMux      *http.ServeMux
+	address       string
+	endpoint      string
+	checkOrigin   func(r *http.Request) bool
+	logger        Logger
+	enableStorage bool
 }
 
 func defaultOptions() *options {
@@ -57,6 +58,11 @@ func (o *options) IgnoreCheckOrigin() *options {
 	o.checkOrigin = func(r *http.Request) bool {
 		return true
 	}
+	return o
+}
+
+func (o *options) EnableStorage() *options {
+	o.enableStorage = true
 	return o
 }
 

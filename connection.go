@@ -115,7 +115,7 @@ func (c *Client) close() error {
 	}()
 
 	if c.server.storage != nil {
-		c.server.storage.RemoveClientByID(c.id)
+		c.server.storage.removeClientByID(c.id)
 	}
 
 	return c.ws.Close()
