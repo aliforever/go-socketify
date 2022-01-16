@@ -37,7 +37,7 @@ func (c *Client) processWriter() {
 			Data: update.Data,
 		})
 		if err != nil {
-			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("Update Type: %s - Update Data: %s", update.Type, update.Data))
+			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("Update Type: %s - Update Data: %s. RemoteAddr: %s", update.Type, update.Data, c.ws.RemoteAddr().String()))
 		}
 	}
 }
@@ -58,19 +58,19 @@ func (c *Client) ProcessUpdates() (err error) {
 	for {
 		_, message, err = c.ws.ReadMessage()
 		if err != nil {
-			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s.", err))
+			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
 			return
 		}
 
 		var update *Update
 		jsonErr := json.Unmarshal(message, &update)
 		if jsonErr != nil {
-			c.server.opts.logger.Error(fmt.Sprintf("Error Unmarshalling Request: %s. Data: %s", jsonErr, message))
+			c.server.opts.logger.Error(fmt.Sprintf("Error Unmarshalling Request: %s. Data: %s. RemoteAddr: %s", jsonErr, message, c.ws.RemoteAddr().String()))
 			continue
 		}
 
 		if update.Type == "" {
-			c.server.opts.logger.Error(fmt.Sprintf("Error Due to Empty Update Type. Data: %s", message))
+			c.server.opts.logger.Error(fmt.Sprintf("Error Due to Empty Update Type. Data: %s. RemoteAddr: %s", message, c.ws.RemoteAddr().String()))
 			continue
 		}
 

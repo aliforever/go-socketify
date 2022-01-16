@@ -16,8 +16,11 @@ func main() {
 		})
 		fmt.Println("new client")
 		go client.ProcessUpdates()
-		for update := range client.Updates() {
-			fmt.Println(update)
-		}
+		go func(c *socketify.Client) {
+			for update := range c.Updates() {
+				fmt.Println(update)
+			}
+		}(client)
+
 	}
 }
