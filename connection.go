@@ -99,7 +99,7 @@ func (c *Client) ProcessUpdates() (err error) {
 // HandleUpdate registers a default handler for updateType
 // Care: If you use this method for an updateType, you won't receive the respected update in your listener
 func (c *Client) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
-	c.handlersLocker.Unlock()
+	c.handlersLocker.Lock()
 	defer c.handlersLocker.Unlock()
 	c.handlers[updateType] = handler
 }
