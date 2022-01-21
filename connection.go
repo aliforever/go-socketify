@@ -5,16 +5,18 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/teris-io/shortid"
+	"sync"
 )
 
 type Client struct {
-	id       string
-	server   *Socketify
-	ws       *websocket.Conn
-	updates  chan *Update
-	writer   chan *serverUpdate
-	handlers map[string]func(message json.RawMessage)
-	closed   chan bool
+	id             string
+	server         *Socketify
+	ws             *websocket.Conn
+	updates        chan *Update
+	writer         chan *serverUpdate
+	handlers       map[string]func(message json.RawMessage)
+	handlersLocker sync.Mutex
+	closed         chan bool
 }
 
 func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
@@ -82,10 +84,13 @@ func (c *Client) ProcessUpdates() (err error) {
 
 		// Check if there's a default handler registered for the updateType and call it
 		// If any handlers found, the update will be processed by that handler and won't be passed to the updates channel
+		c.handlersLocker.Lock()
 		if handler, ok := c.handlers[update.Type]; ok {
+			c.handlersLocker.Unlock()
 			handler(update.Data)
 			continue
 		}
+		c.handlersLocker.Unlock()
 
 		c.updates <- update
 	}
@@ -94,6 +99,8 @@ func (c *Client) ProcessUpdates() (err error) {
 // HandleUpdate registers a default handler for updateType
 // Care: If you use this method for an updateType, you won't receive the respected update in your listener
 func (c *Client) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
+	c.handlersLocker.Unlock()
+	defer c.handlersLocker.Unlock()
 	c.handlers[updateType] = handler
 }
 
