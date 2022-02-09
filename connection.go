@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/teris-io/shortid"
+	"net/http"
 	"sync"
 )
 
@@ -16,18 +17,20 @@ type Client struct {
 	writer         chan *serverUpdate
 	handlers       map[string]func(message json.RawMessage)
 	handlersLocker sync.Mutex
+	upgradeRequest *http.Request
 	closed         chan bool
 }
 
-func newClient(server *Socketify, ws *websocket.Conn) (c *Client) {
+func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
 	c = &Client{
-		id:       shortid.MustGenerate(),
-		server:   server,
-		ws:       ws,
-		updates:  make(chan *Update),
-		writer:   make(chan *serverUpdate),
-		handlers: map[string]func(message json.RawMessage){},
-		closed:   make(chan bool),
+		id:             shortid.MustGenerate(),
+		server:         server,
+		ws:             ws,
+		updates:        make(chan *Update),
+		writer:         make(chan *serverUpdate),
+		handlers:       map[string]func(message json.RawMessage){},
+		closed:         make(chan bool),
+		upgradeRequest: upgradeRequest,
 	}
 	go c.processWriter()
 
@@ -48,6 +51,10 @@ func (c *Client) processWriter() {
 			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("Update Type: %s - Update Data: %s. RemoteAddr: %s", update.Type, update.Data, c.ws.RemoteAddr().String()))
 		}
 	}
+}
+
+func (c *Client) UpgradeRequest() *http.Request {
+	return c.upgradeRequest
 }
 
 func (c *Client) WriteUpdate(updateType string, data interface{}) {

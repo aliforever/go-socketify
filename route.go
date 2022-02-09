@@ -12,7 +12,7 @@ func (s *Socketify) websocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := newClient(s, c)
+	client := newClient(s, c, r)
 	if s.storage != nil {
 		s.storage.addClient(client)
 	}
