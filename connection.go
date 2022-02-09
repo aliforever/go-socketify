@@ -15,7 +15,8 @@ type Client struct {
 	ws             *websocket.Conn
 	updates        chan *Update
 	writer         chan *serverUpdate
-	handlers       map[string]func(message json.RawMessage)
+	handlers       map[string]func(json.RawMessage)
+	rawHandler     func(message json.RawMessage)
 	handlersLocker sync.Mutex
 	upgradeRequest *http.Request
 	closed         chan bool
@@ -77,6 +78,11 @@ func (c *Client) ProcessUpdates() (err error) {
 			return
 		}
 
+		if c.rawHandler != nil {
+			c.rawHandler(message)
+			continue
+		}
+
 		var update *Update
 		jsonErr := json.Unmarshal(message, &update)
 		if jsonErr != nil {
@@ -101,6 +107,12 @@ func (c *Client) ProcessUpdates() (err error) {
 
 		c.updates <- update
 	}
+}
+
+// HandleRawUpdate registers a default handler for update
+// Note: Add a raw handler if you don't want to follow the API convention {"type": "", "data": {}}
+func (c *Client) HandleRawUpdate(handler func(message json.RawMessage)) {
+	c.rawHandler = handler
 }
 
 // HandleUpdate registers a default handler for updateType
