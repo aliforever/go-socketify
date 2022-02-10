@@ -14,7 +14,7 @@ type Client struct {
 	server         *Socketify
 	ws             *websocket.Conn
 	updates        chan *Update
-	writer         chan *serverUpdate
+	writer         chan interface{}
 	handlers       map[string]func(json.RawMessage)
 	rawHandler     func(message json.RawMessage)
 	handlersLocker sync.Mutex
@@ -28,7 +28,7 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 		server:         server,
 		ws:             ws,
 		updates:        make(chan *Update),
-		writer:         make(chan *serverUpdate),
+		writer:         make(chan interface{}),
 		handlers:       map[string]func(message json.RawMessage){},
 		closed:         make(chan bool),
 		upgradeRequest: upgradeRequest,
@@ -44,12 +44,9 @@ func (c *Client) ID() string {
 
 func (c *Client) processWriter() {
 	for update := range c.writer {
-		err := c.ws.WriteJSON(serverUpdate{
-			Type: update.Type,
-			Data: update.Data,
-		})
+		err := c.ws.WriteJSON(update)
 		if err != nil {
-			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("Update Type: %s - Update Data: %s. RemoteAddr: %s", update.Type, update.Data, c.ws.RemoteAddr().String()))
+			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, c.ws.RemoteAddr().String()))
 		}
 	}
 }
@@ -63,6 +60,10 @@ func (c *Client) WriteUpdate(updateType string, data interface{}) {
 		Type: updateType,
 		Data: data,
 	}
+}
+
+func (c *Client) WriteRawUpdate(data interface{}) {
+	c.writer <- data
 }
 
 func (c *Client) ProcessUpdates() (err error) {
@@ -133,6 +134,10 @@ func (c *Client) Server() *Socketify {
 
 func (c *Client) CloseChannel() chan bool {
 	return c.closed
+}
+
+func (c *Client) Close() error {
+	return c.close()
 }
 
 func (c *Client) close() error {
