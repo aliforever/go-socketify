@@ -79,12 +79,13 @@ func (c *Client) ProcessUpdates() (err error) {
 			return
 		}
 
+		c.handlersLocker.Lock()
 		if c.rawHandler != nil {
-			c.handlersLocker.Lock()
 			c.rawHandler(message)
 			c.handlersLocker.Unlock()
 			continue
 		}
+		c.handlersLocker.Unlock()
 
 		var update *Update
 		jsonErr := json.Unmarshal(message, &update)
