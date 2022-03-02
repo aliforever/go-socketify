@@ -80,7 +80,9 @@ func (c *Client) ProcessUpdates() (err error) {
 		}
 
 		if c.rawHandler != nil {
+			c.handlersLocker.Lock()
 			c.rawHandler(message)
+			c.handlersLocker.Unlock()
 			continue
 		}
 
@@ -113,6 +115,8 @@ func (c *Client) ProcessUpdates() (err error) {
 // HandleRawUpdate registers a default handler for update
 // Note: Add a raw handler if you don't want to follow the API convention {"type": "", "data": {}}
 func (c *Client) HandleRawUpdate(handler func(message json.RawMessage)) {
+	c.handlersLocker.Lock()
+	defer c.handlersLocker.Unlock()
 	c.rawHandler = handler
 }
 
