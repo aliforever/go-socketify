@@ -27,6 +27,22 @@ func (s *storage) GetClientByID(clientID string) *Client {
 	return s.clients[clientID]
 }
 
+func (s *storage) GetClientsByAttributeValue(key, value string) []*Client {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	var clients []*Client
+	for index, client := range s.clients {
+		if val, exists := client.GetAttribute(key); exists {
+			if val == value {
+				clients = append(clients, s.clients[index])
+			}
+		}
+	}
+
+	return clients
+}
+
 func (s *storage) removeClientByID(clientID string) {
 	s.m.Lock()
 	defer s.m.Unlock()

@@ -10,16 +10,18 @@ import (
 )
 
 type Client struct {
-	id             string
-	server         *Socketify
-	ws             *websocket.Conn
-	updates        chan *Update
-	writer         chan interface{}
-	handlers       map[string]func(json.RawMessage)
-	rawHandler     func(message json.RawMessage)
-	handlersLocker sync.Mutex
-	upgradeRequest *http.Request
-	closed         chan bool
+	id               string
+	server           *Socketify
+	ws               *websocket.Conn
+	updates          chan *Update
+	writer           chan interface{}
+	handlers         map[string]func(json.RawMessage)
+	rawHandler       func(message json.RawMessage)
+	handlersLocker   sync.Mutex
+	upgradeRequest   *http.Request
+	closed           chan bool
+	attributes       map[string]string
+	attributesLocker sync.Mutex
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -32,6 +34,7 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 		handlers:       map[string]func(message json.RawMessage){},
 		closed:         make(chan bool),
 		upgradeRequest: upgradeRequest,
+		attributes:     map[string]string{},
 	}
 	go c.processWriter()
 
@@ -40,6 +43,21 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 
 func (c *Client) ID() string {
 	return c.id
+}
+
+func (c *Client) SetAttribute(key, val string) {
+	c.attributesLocker.Lock()
+	defer c.attributesLocker.Unlock()
+
+	c.attributes[key] = val
+}
+
+func (c *Client) GetAttribute(key string) (val string, exists bool) {
+	c.attributesLocker.Lock()
+	defer c.attributesLocker.Unlock()
+
+	val, exists = c.attributes[key]
+	return
 }
 
 func (c *Client) processWriter() {
