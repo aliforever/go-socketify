@@ -2,6 +2,7 @@ package socketify
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
 	"github.com/teris-io/shortid"
@@ -84,12 +85,11 @@ func (c *Client) WriteRawUpdate(data interface{}) {
 	c.writer <- data
 }
 
-func (c *Client) ProcessUpdates() (err error) {
-	defer c.close()
-
+func (c *Client) handleIncomingUpdates() (err error) {
 	var (
 		message []byte
 	)
+
 	for {
 		_, message, err = c.ws.ReadMessage()
 		if err != nil {
@@ -129,6 +129,20 @@ func (c *Client) ProcessUpdates() (err error) {
 
 		c.updates <- update
 	}
+}
+
+func (c *Client) ProcessUpdates() (err error) {
+	defer c.close()
+
+	go c.handleIncomingUpdates()
+
+	<-c.closed
+
+	fmt.Println("connection closed ")
+
+	err = errors.New("connection_closed")
+
+	return
 }
 
 // HandleRawUpdate registers a default handler for update

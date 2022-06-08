@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/aliforever/go-socketify"
+	"strings"
 )
 
 func main() {
@@ -11,14 +11,11 @@ func main() {
 	go server.Listen()
 
 	for client := range server.Clients() {
-		client.HandleUpdate("PING", func(message json.RawMessage) {
-			client.WriteUpdate("PONG", nil)
+		client.HandleRawUpdate(func(message json.RawMessage) {
+			if strings.Contains(string(message), "close") {
+				client.Close()
+			}
 		})
 		go client.ProcessUpdates()
-		go func(c *socketify.Client) {
-			for update := range c.Updates() {
-				fmt.Println(update)
-			}
-		}(client)
 	}
 }
