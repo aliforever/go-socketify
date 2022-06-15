@@ -23,6 +23,7 @@ type Client struct {
 	closed           chan bool
 	attributes       map[string]string
 	attributesLocker sync.Mutex
+	onClose          func()
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -44,6 +45,10 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 
 func (c *Client) ID() string {
 	return c.id
+}
+
+func (c *Client) SetOnClose(onClose func()) {
+	c.onClose = onClose
 }
 
 func (c *Client) SetAttribute(key, val string) {
@@ -138,7 +143,9 @@ func (c *Client) ProcessUpdates() (err error) {
 
 	<-c.closed
 
-	fmt.Println("connection closed ")
+	if c.onClose != nil {
+		go c.onClose()
+	}
 
 	err = errors.New("connection_closed")
 
