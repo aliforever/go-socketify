@@ -8,6 +8,7 @@ import (
 	"github.com/teris-io/shortid"
 	"net/http"
 	"sync"
+	"time"
 )
 
 type Client struct {
@@ -24,6 +25,7 @@ type Client struct {
 	attributes       map[string]string
 	attributesLocker sync.Mutex
 	onClose          func()
+	keepAlive        time.Duration
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -41,6 +43,10 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 	go c.processWriter()
 
 	return
+}
+
+func (c *Client) SetKeepAliveDuration(keepAlive time.Duration) {
+	c.keepAlive = keepAlive
 }
 
 func (c *Client) ID() string {
@@ -90,15 +96,43 @@ func (c *Client) WriteRawUpdate(data interface{}) {
 	c.writer <- data
 }
 
-func (c *Client) handleIncomingUpdates() (err error) {
+func (c *Client) ping() {
+	if c.keepAlive != 0 {
+		ticker := time.NewTicker(c.keepAlive)
+		for range ticker.C {
+			err := c.ws.WriteMessage(websocket.PingMessage, nil)
+			if err != nil {
+				return
+			}
+		}
+	}
+}
+
+func (c *Client) handleIncomingUpdates(errChannel chan error) {
 	var (
 		message []byte
+		err     error
 	)
+
+	if c.keepAlive > 0 {
+		c.ws.SetReadDeadline(time.Now().Add(c.keepAlive))
+		c.ws.SetPingHandler(func(d string) error {
+			fmt.Println("received ping", d)
+			c.ws.SetReadDeadline(time.Now().Add(c.keepAlive))
+			return c.ws.WriteMessage(websocket.PongMessage, nil)
+		})
+		c.ws.SetPongHandler(func(d string) error {
+			fmt.Println("received pong", d)
+			return c.ws.SetReadDeadline(time.Now().Add(c.keepAlive))
+		})
+		go c.ping()
+	}
 
 	for {
 		_, message, err = c.ws.ReadMessage()
 		if err != nil {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
+			errChannel <- err
 			return
 		}
 
@@ -137,19 +171,18 @@ func (c *Client) handleIncomingUpdates() (err error) {
 }
 
 func (c *Client) ProcessUpdates() (err error) {
-	defer c.close()
+	errChan := make(chan error)
 
-	go c.handleIncomingUpdates()
+	go c.handleIncomingUpdates(errChan)
 
-	<-c.closed
-
-	if c.onClose != nil {
-		go c.onClose()
+	select {
+	case err = <-errChan:
+		go c.close()
+		return err
+	case <-c.closed:
+		err = errors.New("connection_closed")
+		return
 	}
-
-	err = errors.New("connection_closed")
-
-	return
 }
 
 // HandleRawUpdate registers a default handler for update
@@ -191,6 +224,10 @@ func (c *Client) close() error {
 
 	if c.server.storage != nil {
 		c.server.storage.removeClientByID(c.id)
+	}
+
+	if c.onClose != nil {
+		go c.onClose()
 	}
 
 	return c.ws.Close()

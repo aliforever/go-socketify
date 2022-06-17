@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"github.com/aliforever/go-socketify"
 	"strings"
+	"time"
 )
 
 func main() {
-	server := socketify.New(socketify.Options().SetAddress(":8080").SetEndpoint("/ws").IgnoreCheckOrigin())
+	server := socketify.New(socketify.Options().SetAddress(":8080").SetEndpoint("/").IgnoreCheckOrigin())
 	go server.Listen()
 
 	for client := range server.Clients() {
@@ -16,6 +17,7 @@ func main() {
 				client.Close()
 			}
 		})
+		client.SetKeepAliveDuration(time.Second * 5)
 		go client.ProcessUpdates()
 	}
 }
