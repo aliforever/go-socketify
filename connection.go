@@ -117,12 +117,10 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 	if c.keepAlive > 0 {
 		c.ws.SetReadDeadline(time.Now().Add(c.keepAlive))
 		c.ws.SetPingHandler(func(d string) error {
-			fmt.Println("received ping", d)
 			c.ws.SetReadDeadline(time.Now().Add(c.keepAlive))
 			return c.ws.WriteMessage(websocket.PongMessage, nil)
 		})
 		c.ws.SetPongHandler(func(d string) error {
-			fmt.Println("received pong", d)
 			return c.ws.SetReadDeadline(time.Now().Add(c.keepAlive))
 		})
 		go c.ping()
