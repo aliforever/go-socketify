@@ -49,6 +49,8 @@ func (s *storage) SetClientForID(id string, client *Client) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
+	delete(s.clients, client.id)
+	client.id = id
 	s.clients[id] = client
 }
 

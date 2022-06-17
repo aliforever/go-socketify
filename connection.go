@@ -50,6 +50,10 @@ func (c *Client) SetKeepAliveDuration(keepAlive time.Duration) {
 	c.keepAlive = keepAlive
 }
 
+func (c *Client) SetMiddleware(middleware func() error) {
+	c.middleware = middleware
+}
+
 func (c *Client) ID() string {
 	return c.id
 }
