@@ -12,21 +12,22 @@ import (
 )
 
 type Client struct {
-	id               string
-	server           *Socketify
-	ws               *websocket.Conn
-	updates          chan *Update
-	writer           chan interface{}
-	handlers         map[string]func(json.RawMessage)
-	rawHandler       func(message json.RawMessage)
-	handlersLocker   sync.Mutex
-	upgradeRequest   *http.Request
-	closed           chan bool
-	attributes       map[string]string
-	attributesLocker sync.Mutex
-	onClose          func()
-	keepAlive        time.Duration
-	middleware       func() error
+	id                      string
+	server                  *Socketify
+	ws                      *websocket.Conn
+	updates                 chan *Update // TODO: Remove this or the raw update handler
+	writer                  chan interface{}
+	handlers                map[string]func(json.RawMessage)
+	rawHandler              func(message []byte)
+	handlersLocker          sync.Mutex
+	upgradeRequest          *http.Request
+	closed                  chan bool
+	attributes              map[string]string
+	attributesLocker        sync.Mutex
+	onClose                 func()
+	keepAlive               time.Duration
+	middleware              func() error
+	middlewareForUpdateType func(updateType string) error
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -52,6 +53,10 @@ func (c *Client) SetKeepAliveDuration(keepAlive time.Duration) {
 
 func (c *Client) SetMiddleware(middleware func() error) {
 	c.middleware = middleware
+}
+
+func (c *Client) SetUpdateTypeMiddleware(middleware func(updateType string) error) {
+	c.middlewareForUpdateType = middleware
 }
 
 func (c *Client) ID() string {
@@ -166,6 +171,13 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 			continue
 		}
 
+		if c.middlewareForUpdateType != nil {
+			if err := c.middlewareForUpdateType(update.Type); err != nil {
+				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
+				continue
+			}
+		}
+
 		// Check if there's a default handler registered for the updateType and call it
 		// If any handlers found, the update will be processed by that handler and won't be passed to the updates channel
 		c.handlersLocker.Lock()
@@ -197,7 +209,7 @@ func (c *Client) ProcessUpdates() (err error) {
 
 // HandleRawUpdate registers a default handler for update
 // Note: Add a raw handler if you don't want to follow the API convention {"type": "", "data": {}}
-func (c *Client) HandleRawUpdate(handler func(message json.RawMessage)) {
+func (c *Client) HandleRawUpdate(handler func(message []byte)) {
 	c.handlersLocker.Lock()
 	defer c.handlersLocker.Unlock()
 	c.rawHandler = handler
