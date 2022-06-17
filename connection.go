@@ -26,6 +26,7 @@ type Client struct {
 	attributesLocker sync.Mutex
 	onClose          func()
 	keepAlive        time.Duration
+	middleware       func() error
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -132,6 +133,13 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
 			errChannel <- err
 			return
+		}
+
+		if c.middleware != nil {
+			if err = c.middleware(); err != nil {
+				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
+				continue
+			}
 		}
 
 		c.handlersLocker.Lock()
