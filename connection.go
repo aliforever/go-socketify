@@ -16,7 +16,7 @@ type Client struct {
 	server                  *Socketify
 	ws                      *websocket.Conn
 	updates                 chan *Update // TODO: Remove this or the raw update handler
-	writer                  chan interface{}
+	writer                  chan *serverUpdate
 	handlers                map[string]func(json.RawMessage)
 	rawHandler              func(message []byte)
 	handlersLocker          sync.Mutex
@@ -36,7 +36,7 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 		server:         server,
 		ws:             ws,
 		updates:        make(chan *Update),
-		writer:         make(chan interface{}),
+		writer:         make(chan *serverUpdate),
 		handlers:       map[string]func(message json.RawMessage){},
 		closed:         make(chan bool),
 		upgradeRequest: upgradeRequest,
@@ -84,10 +84,19 @@ func (c *Client) GetAttribute(key string) (val string, exists bool) {
 
 func (c *Client) processWriter() {
 	for update := range c.writer {
-		err := c.ws.WriteJSON(update)
+		var data interface{}
+		if update.Type == "" {
+			data = update.Data
+		} else {
+			data = update
+		}
+		err := c.ws.WriteJSON(data)
 		if err != nil {
 			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, c.ws.RemoteAddr().String()))
 		}
+		go func(update *serverUpdate, err error) {
+			update.err <- err
+		}(update, err)
 	}
 }
 
@@ -95,15 +104,31 @@ func (c *Client) UpgradeRequest() *http.Request {
 	return c.upgradeRequest
 }
 
-func (c *Client) WriteUpdate(updateType string, data interface{}) {
+func (c *Client) WriteUpdate(updateType string, data interface{}) (err error) {
+	errChan := make(chan error)
+
 	c.writer <- &serverUpdate{
 		Type: updateType,
 		Data: data,
+		err:  errChan,
 	}
+
+	err = <-errChan
+
+	return
 }
 
-func (c *Client) WriteRawUpdate(data interface{}) {
-	c.writer <- data
+func (c *Client) WriteRawUpdate(data interface{}) (err error) {
+	errChan := make(chan error)
+
+	c.writer <- &serverUpdate{
+		Type: "",
+		Data: data,
+		err:  errChan,
+	}
+
+	err = <-errChan
+	return
 }
 
 func (c *Client) ping() {
