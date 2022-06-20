@@ -1,4 +1,4 @@
-module go-socketify
+module github.com/aliforever/go-socketify
 
 go 1.18
 
