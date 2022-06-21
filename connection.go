@@ -16,7 +16,7 @@ type Client struct {
 	server                  *Socketify
 	ws                      *websocket.Conn
 	updates                 chan *Update // TODO: Remove this or the raw update handler
-	writer                  chan *serverUpdate
+	writer                  chan messageType
 	handlers                map[string]func(json.RawMessage)
 	rawHandler              func(message []byte)
 	handlersLocker          sync.Mutex
@@ -36,7 +36,7 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 		server:         server,
 		ws:             ws,
 		updates:        make(chan *Update),
-		writer:         make(chan *serverUpdate),
+		writer:         make(chan messageType),
 		handlers:       map[string]func(message json.RawMessage){},
 		closed:         make(chan bool),
 		upgradeRequest: upgradeRequest,

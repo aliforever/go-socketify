@@ -10,5 +10,4 @@ type Update struct {
 type serverUpdate struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data,omitempty"`
-	err  chan error
 }
