@@ -6,6 +6,12 @@ import (
 	"time"
 )
 
+func (c *Client) WriteInternalUpdate(update []byte) {
+	c.internalUpdates <- update
+	// TODO: Decide to move this to goroutine or not, because people might forget to do so in their application leading \
+	//  to a deadlock
+}
+
 func (c *Client) WriteUpdate(updateType string, data interface{}) (err error) {
 	jm := newJSONMessage(serverUpdate{
 		Type: updateType,
