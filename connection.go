@@ -16,6 +16,7 @@ type Client struct {
 	server                  *Socketify
 	ws                      *websocket.Conn
 	updates                 chan *Update // TODO: Remove this or the raw update handler
+	internalUpdates         chan []byte
 	writer                  chan messageType
 	handlers                map[string]func(json.RawMessage)
 	rawHandler              func(message []byte)
@@ -32,15 +33,16 @@ type Client struct {
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
 	c = &Client{
-		id:             shortid.MustGenerate(),
-		server:         server,
-		ws:             ws,
-		updates:        make(chan *Update),
-		writer:         make(chan messageType),
-		handlers:       map[string]func(message json.RawMessage){},
-		closed:         make(chan bool),
-		upgradeRequest: upgradeRequest,
-		attributes:     map[string]string{},
+		id:              shortid.MustGenerate(),
+		server:          server,
+		ws:              ws,
+		updates:         make(chan *Update),
+		writer:          make(chan messageType),
+		handlers:        map[string]func(message json.RawMessage){},
+		closed:          make(chan bool),
+		upgradeRequest:  upgradeRequest,
+		attributes:      map[string]string{},
+		internalUpdates: make(chan []byte),
 	}
 	go c.processWriter()
 
@@ -173,6 +175,10 @@ func (c *Client) ProcessUpdates() (err error) {
 		err = errors.New("connection_closed")
 		return
 	}
+}
+
+func (c *Client) InternalUpdates() <-chan []byte {
+	return c.internalUpdates
 }
 
 // HandleRawUpdate registers a default handler for update
