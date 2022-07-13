@@ -33,6 +33,14 @@ func (c *Client) WriteBinaryBytes(data []byte) (err error) {
 	return <-jm.err
 }
 
+func (c *Client) WriteBinaryText(data []byte) (err error) {
+	jm := newBinaryTextMessage(data)
+
+	c.writer <- jm
+
+	return <-jm.err
+}
+
 func (c *Client) WriteText(data string) (err error) {
 	jm := newTextMessage(data)
 
