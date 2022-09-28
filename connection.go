@@ -29,6 +29,7 @@ type Client struct {
 	keepAlive               time.Duration
 	middleware              func() error
 	middlewareForUpdateType func(updateType string) error
+	clientErrors            chan error
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -43,6 +44,7 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 		upgradeRequest:  upgradeRequest,
 		attributes:      map[string]string{},
 		internalUpdates: make(chan []byte),
+		clientErrors:    make(chan error),
 	}
 	go c.processWriter()
 
@@ -88,6 +90,12 @@ func (c *Client) UpgradeRequest() *http.Request {
 	return c.upgradeRequest
 }
 
+func (c *Client) reportError(err error) {
+	go func() {
+		c.clientErrors <- err
+	}()
+}
+
 func (c *Client) handleIncomingUpdates(errChannel chan error) {
 	var (
 		message []byte
@@ -111,12 +119,14 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 		if err != nil {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
 			errChannel <- err
+			c.reportError(err)
 			return
 		}
 
 		if c.middleware != nil {
 			if err = c.middleware(); err != nil {
 				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
+				c.reportError(err)
 				continue
 			}
 		}
@@ -133,17 +143,20 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 		jsonErr := json.Unmarshal(message, &update)
 		if jsonErr != nil {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Unmarshalling Request: %s. Data: %s. RemoteAddr: %s", jsonErr, message, c.ws.RemoteAddr().String()))
+			c.reportError(err)
 			continue
 		}
 
 		if update.Type == "" {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Due to Empty Update Type. Data: %s. RemoteAddr: %s", message, c.ws.RemoteAddr().String()))
+			c.reportError(err)
 			continue
 		}
 
 		if c.middlewareForUpdateType != nil {
 			if err := c.middlewareForUpdateType(update.Type); err != nil {
 				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
+				c.reportError(err)
 				continue
 			}
 		}
@@ -160,6 +173,10 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 
 		c.updates <- update
 	}
+}
+
+func (c *Client) Errors() chan<- error {
+	return c.clientErrors
 }
 
 func (c *Client) ProcessUpdates() (err error) {
