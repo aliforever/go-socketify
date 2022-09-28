@@ -143,13 +143,13 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 		jsonErr := json.Unmarshal(message, &update)
 		if jsonErr != nil {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Unmarshalling Request: %s. Data: %s. RemoteAddr: %s", jsonErr, message, c.ws.RemoteAddr().String()))
-			c.reportError(err)
+			c.reportError(jsonErr)
 			continue
 		}
 
 		if update.Type == "" {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Due to Empty Update Type. Data: %s. RemoteAddr: %s", message, c.ws.RemoteAddr().String()))
-			c.reportError(err)
+			c.reportError(errors.New("empty update type"))
 			continue
 		}
 
