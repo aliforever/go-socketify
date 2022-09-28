@@ -175,7 +175,7 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 	}
 }
 
-func (c *Client) Errors() chan<- error {
+func (c *Client) Errors() <-chan error {
 	return c.clientErrors
 }
 
