@@ -90,6 +90,61 @@ func (c *Client) UpgradeRequest() *http.Request {
 	return c.upgradeRequest
 }
 
+func (c *Client) Errors() <-chan error {
+	return c.clientErrors
+}
+
+func (c *Client) ProcessUpdates() (err error) {
+	errChan := make(chan error)
+
+	go c.handleIncomingUpdates(errChan)
+
+	select {
+	case err = <-errChan:
+		go c.close()
+		return err
+	case <-c.closed:
+		err = errors.New("connection_closed")
+		return
+	}
+}
+
+func (c *Client) InternalUpdates() <-chan []byte {
+	return c.internalUpdates
+}
+
+// HandleRawUpdate registers a default handler for update
+// Note: Add a raw handler if you don't want to follow the API convention {"type": "", "data": {}}
+func (c *Client) HandleRawUpdate(handler func(message []byte)) {
+	c.handlersLocker.Lock()
+	defer c.handlersLocker.Unlock()
+	c.rawHandler = handler
+}
+
+// HandleUpdate registers a default handler for updateType
+// Care: If you use this method for an updateType, you won't receive the respected update in your listener
+func (c *Client) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
+	c.handlersLocker.Lock()
+	defer c.handlersLocker.Unlock()
+	c.handlers[updateType] = handler
+}
+
+func (c *Client) Updates() chan *Update {
+	return c.updates
+}
+
+func (c *Client) Server() *Socketify {
+	return c.server
+}
+
+func (c *Client) CloseChannel() chan bool {
+	return c.closed
+}
+
+func (c *Client) Close() error {
+	return c.close()
+}
+
 func (c *Client) reportError(err error) {
 	go func() {
 		c.clientErrors <- err
@@ -173,61 +228,6 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 
 		c.updates <- update
 	}
-}
-
-func (c *Client) Errors() <-chan error {
-	return c.clientErrors
-}
-
-func (c *Client) ProcessUpdates() (err error) {
-	errChan := make(chan error)
-
-	go c.handleIncomingUpdates(errChan)
-
-	select {
-	case err = <-errChan:
-		go c.close()
-		return err
-	case <-c.closed:
-		err = errors.New("connection_closed")
-		return
-	}
-}
-
-func (c *Client) InternalUpdates() <-chan []byte {
-	return c.internalUpdates
-}
-
-// HandleRawUpdate registers a default handler for update
-// Note: Add a raw handler if you don't want to follow the API convention {"type": "", "data": {}}
-func (c *Client) HandleRawUpdate(handler func(message []byte)) {
-	c.handlersLocker.Lock()
-	defer c.handlersLocker.Unlock()
-	c.rawHandler = handler
-}
-
-// HandleUpdate registers a default handler for updateType
-// Care: If you use this method for an updateType, you won't receive the respected update in your listener
-func (c *Client) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
-	c.handlersLocker.Lock()
-	defer c.handlersLocker.Unlock()
-	c.handlers[updateType] = handler
-}
-
-func (c *Client) Updates() chan *Update {
-	return c.updates
-}
-
-func (c *Client) Server() *Socketify {
-	return c.server
-}
-
-func (c *Client) CloseChannel() chan bool {
-	return c.closed
-}
-
-func (c *Client) Close() error {
-	return c.close()
 }
 
 func (c *Client) close() error {
