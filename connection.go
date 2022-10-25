@@ -12,24 +12,24 @@ import (
 )
 
 type Client struct {
-	id                      string
-	server                  *Socketify
-	ws                      *websocket.Conn
-	updates                 chan *Update // TODO: Remove this or the raw update handler
-	internalUpdates         chan []byte
-	writer                  chan messageType
-	handlers                map[string]func(json.RawMessage)
-	rawHandler              func(message []byte)
-	handlersLocker          sync.Mutex
-	upgradeRequest          *http.Request
-	closed                  chan bool
-	attributes              map[string]string
-	attributesLocker        sync.Mutex
-	onClose                 func()
-	keepAlive               time.Duration
-	middleware              func() error
-	middlewareForUpdateType func(updateType string) error
-	clientErrors            chan error
+	id                  string
+	server              *Socketify
+	ws                  *websocket.Conn
+	updates             chan *Update // TODO: Remove this or the raw update handler
+	internalUpdates     chan []byte
+	writer              chan messageType
+	handlers            map[string]func(json.RawMessage)
+	rawHandler          func(message []byte)
+	handlersLocker      sync.Mutex
+	upgradeRequest      *http.Request
+	closed              chan bool
+	attributes          map[string]string
+	attributesLocker    sync.Mutex
+	onClose             func()
+	keepAlive           time.Duration
+	middleware          func() error
+	middlewareForUpdate func(updateType string, data json.RawMessage) error
+	clientErrors        chan error
 }
 
 func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
@@ -59,8 +59,8 @@ func (c *Client) SetMiddleware(middleware func() error) {
 	c.middleware = middleware
 }
 
-func (c *Client) SetUpdateTypeMiddleware(middleware func(updateType string) error) {
-	c.middlewareForUpdateType = middleware
+func (c *Client) SetUpdateTypeMiddleware(middleware func(updateType string, data json.RawMessage) error) {
+	c.middlewareForUpdate = middleware
 }
 
 func (c *Client) ID() string {
@@ -208,8 +208,8 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 			continue
 		}
 
-		if c.middlewareForUpdateType != nil {
-			if err := c.middlewareForUpdateType(update.Type); err != nil {
+		if c.middlewareForUpdate != nil {
+			if err := c.middlewareForUpdate(update.Type, update.Data); err != nil {
 				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
 				c.reportError(err)
 				continue
