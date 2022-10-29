@@ -1,6 +1,9 @@
 package socketify
 
-import "net/http"
+import (
+	"github.com/teris-io/shortid"
+	"net/http"
+)
 
 const (
 	defaultAddress  = ":8080"
@@ -14,6 +17,7 @@ type options struct {
 	checkOrigin   func(r *http.Request) bool
 	logger        Logger
 	enableStorage bool
+	idFunc        func(r *http.Request) string
 }
 
 func defaultOptions() *options {
@@ -27,6 +31,11 @@ func defaultOptions() *options {
 
 func Options() *options {
 	return &options{}
+}
+
+func (o *options) SetIdSetterFunction(fn func(r *http.Request) string) *options {
+	o.idFunc = fn
+	return o
 }
 
 func (o *options) SetEndpoint(endpoint string) *options {
@@ -78,5 +87,10 @@ func (o *options) fillDefaults() {
 	}
 	if o.logger == nil {
 		o.logger = logger{}
+	}
+	if o.idFunc == nil {
+		o.idFunc = func(_ *http.Request) string {
+			return shortid.MustGenerate()
+		}
 	}
 }

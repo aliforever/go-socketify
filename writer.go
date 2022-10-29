@@ -6,13 +6,13 @@ import (
 	"time"
 )
 
-func (c *Client) WriteInternalUpdate(update []byte) {
+func (c *Connection) WriteInternalUpdate(update []byte) {
 	c.internalUpdates <- update
 	// TODO: Decide to move this to goroutine or not, because people might forget to do so in their application leading \
 	//  to a deadlock
 }
 
-func (c *Client) WriteUpdate(updateType string, data interface{}) (err error) {
+func (c *Connection) WriteUpdate(updateType string, data interface{}) (err error) {
 	jm := newJSONMessage(serverUpdate{
 		Type: updateType,
 		Data: data,
@@ -23,7 +23,7 @@ func (c *Client) WriteUpdate(updateType string, data interface{}) (err error) {
 	return <-jm.err
 }
 
-func (c *Client) WriteRawUpdate(data interface{}) (err error) {
+func (c *Connection) WriteRawUpdate(data interface{}) (err error) {
 	jm := newJSONMessage(data)
 
 	c.writer <- jm
@@ -31,7 +31,7 @@ func (c *Client) WriteRawUpdate(data interface{}) (err error) {
 	return <-jm.err
 }
 
-func (c *Client) WriteBinaryBytes(data []byte) (err error) {
+func (c *Connection) WriteBinaryBytes(data []byte) (err error) {
 	jm := newBinaryMessage(data)
 
 	c.writer <- jm
@@ -39,7 +39,7 @@ func (c *Client) WriteBinaryBytes(data []byte) (err error) {
 	return <-jm.err
 }
 
-func (c *Client) WriteBinaryText(data []byte) (err error) {
+func (c *Connection) WriteBinaryText(data []byte) (err error) {
 	jm := newBinaryTextMessage(data)
 
 	c.writer <- jm
@@ -47,7 +47,7 @@ func (c *Client) WriteBinaryText(data []byte) (err error) {
 	return <-jm.err
 }
 
-func (c *Client) WriteText(data string) (err error) {
+func (c *Connection) WriteText(data string) (err error) {
 	jm := newTextMessage(data)
 
 	c.writer <- jm
@@ -55,7 +55,7 @@ func (c *Client) WriteText(data string) (err error) {
 	return <-jm.err
 }
 
-func (c *Client) ping() {
+func (c *Connection) ping() {
 	if c.keepAlive != 0 {
 		ticker := time.NewTicker(c.keepAlive)
 		for range ticker.C {
@@ -67,7 +67,7 @@ func (c *Client) ping() {
 	}
 }
 
-func (c *Client) processWriter() {
+func (c *Connection) processWriter() {
 	for update := range c.writer {
 		data, err := update.Data()
 		if err != nil {

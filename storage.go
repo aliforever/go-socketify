@@ -6,27 +6,27 @@ import "sync"
 
 type storage struct {
 	m       sync.Mutex
-	clients map[string]*Client
+	clients map[string]*Connection
 }
 
 func newStorage() *storage {
 	return &storage{
-		clients: map[string]*Client{},
+		clients: map[string]*Connection{},
 	}
 }
 
-func (s *storage) GetClientByID(clientID string) *Client {
+func (s *storage) GetClientByID(clientID string) *Connection {
 	s.m.Lock()
 	defer s.m.Unlock()
 
 	return s.clients[clientID]
 }
 
-func (s *storage) GetClientsByAttributeValue(key, value string) []*Client {
+func (s *storage) GetClientsByAttributeValue(key, value string) []*Connection {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	var clients []*Client
+	var clients []*Connection
 	for index, client := range s.clients {
 		if val, exists := client.GetAttribute(key); exists {
 			if val == value {
@@ -40,7 +40,7 @@ func (s *storage) GetClientsByAttributeValue(key, value string) []*Client {
 
 // SetClientForID Important: Don't use this method if you're not sure what you're doing
 // This might replace the client with an existing alive client
-func (s *storage) SetClientForID(id string, client *Client) {
+func (s *storage) SetClientForID(id string, client *Connection) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -60,7 +60,7 @@ func (s *storage) ClientIDs() (ids []string) {
 	return ids
 }
 
-func (s *storage) addClient(c *Client) {
+func (s *storage) addClient(c *Connection) {
 	s.m.Lock()
 	defer s.m.Unlock()
 

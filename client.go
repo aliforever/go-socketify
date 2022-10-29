@@ -5,17 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/teris-io/shortid"
 	"net/http"
 	"sync"
 	"time"
 )
 
-type Client struct {
+type Connection struct {
 	id                  string
-	server              *Socketify
+	server              *Server
 	ws                  *websocket.Conn
-	updates             chan *Update // TODO: Remove this or the raw update handler
 	internalUpdates     chan []byte
 	writer              chan messageType
 	handlers            map[string]func(json.RawMessage)
@@ -27,17 +25,16 @@ type Client struct {
 	attributesLocker    sync.Mutex
 	onClose             func()
 	keepAlive           time.Duration
-	middleware          func() error
+	middleware          func(message []byte) error
 	middlewareForUpdate func(updateType string, data json.RawMessage) error
 	clientErrors        chan error
 }
 
-func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Request) (c *Client) {
-	c = &Client{
-		id:              shortid.MustGenerate(),
+func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request) (c *Connection) {
+	c = &Connection{
+		id:              server.opts.idFunc(upgradeRequest),
 		server:          server,
 		ws:              ws,
-		updates:         make(chan *Update),
 		writer:          make(chan messageType),
 		handlers:        map[string]func(message json.RawMessage){},
 		closed:          make(chan bool),
@@ -46,39 +43,40 @@ func newClient(server *Socketify, ws *websocket.Conn, upgradeRequest *http.Reque
 		internalUpdates: make(chan []byte),
 		clientErrors:    make(chan error),
 	}
+
 	go c.processWriter()
 
 	return
 }
 
-func (c *Client) SetKeepAliveDuration(keepAlive time.Duration) {
+func (c *Connection) SetKeepAliveDuration(keepAlive time.Duration) {
 	c.keepAlive = keepAlive
 }
 
-func (c *Client) SetMiddleware(middleware func() error) {
+func (c *Connection) SetMiddleware(middleware func(message []byte) error) {
 	c.middleware = middleware
 }
 
-func (c *Client) SetUpdateTypeMiddleware(middleware func(updateType string, data json.RawMessage) error) {
+func (c *Connection) SetUpdateTypeMiddleware(middleware func(updateType string, data json.RawMessage) error) {
 	c.middlewareForUpdate = middleware
 }
 
-func (c *Client) ID() string {
+func (c *Connection) ID() string {
 	return c.id
 }
 
-func (c *Client) SetOnClose(onClose func()) {
+func (c *Connection) SetOnClose(onClose func()) {
 	c.onClose = onClose
 }
 
-func (c *Client) SetAttribute(key, val string) {
+func (c *Connection) SetAttribute(key, val string) {
 	c.attributesLocker.Lock()
 	defer c.attributesLocker.Unlock()
 
 	c.attributes[key] = val
 }
 
-func (c *Client) GetAttribute(key string) (val string, exists bool) {
+func (c *Connection) GetAttribute(key string) (val string, exists bool) {
 	c.attributesLocker.Lock()
 	defer c.attributesLocker.Unlock()
 
@@ -86,36 +84,35 @@ func (c *Client) GetAttribute(key string) (val string, exists bool) {
 	return
 }
 
-func (c *Client) UpgradeRequest() *http.Request {
+func (c *Connection) UpgradeRequest() *http.Request {
 	return c.upgradeRequest
 }
 
-func (c *Client) Errors() <-chan error {
+func (c *Connection) Errors() <-chan error {
 	return c.clientErrors
 }
 
-func (c *Client) ProcessUpdates() (err error) {
+func (c *Connection) ProcessUpdates() error {
 	errChan := make(chan error)
 
 	go c.handleIncomingUpdates(errChan)
 
 	select {
-	case err = <-errChan:
+	case err := <-errChan:
 		go c.close()
 		return err
 	case <-c.closed:
-		err = errors.New("connection_closed")
-		return
+		return errors.New("connection_closed")
 	}
 }
 
-func (c *Client) InternalUpdates() <-chan []byte {
+func (c *Connection) InternalUpdates() <-chan []byte {
 	return c.internalUpdates
 }
 
 // HandleRawUpdate registers a default handler for update
 // Note: Add a raw handler if you don't want to follow the API convention {"type": "", "data": {}}
-func (c *Client) HandleRawUpdate(handler func(message []byte)) {
+func (c *Connection) HandleRawUpdate(handler func(message []byte)) {
 	c.handlersLocker.Lock()
 	defer c.handlersLocker.Unlock()
 	c.rawHandler = handler
@@ -123,35 +120,27 @@ func (c *Client) HandleRawUpdate(handler func(message []byte)) {
 
 // HandleUpdate registers a default handler for updateType
 // Care: If you use this method for an updateType, you won't receive the respected update in your listener
-func (c *Client) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
+func (c *Connection) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
 	c.handlersLocker.Lock()
 	defer c.handlersLocker.Unlock()
 	c.handlers[updateType] = handler
 }
 
-func (c *Client) Updates() chan *Update {
-	return c.updates
-}
-
-func (c *Client) Server() *Socketify {
+func (c *Connection) Server() *Server {
 	return c.server
 }
 
-func (c *Client) CloseChannel() chan bool {
-	return c.closed
-}
-
-func (c *Client) Close() error {
+func (c *Connection) Close() error {
 	return c.close()
 }
 
-func (c *Client) reportError(err error) {
+func (c *Connection) reportError(err error) {
 	go func() {
 		c.clientErrors <- err
 	}()
 }
 
-func (c *Client) handleIncomingUpdates(errChannel chan error) {
+func (c *Connection) handleIncomingUpdates(errChannel chan error) {
 	var (
 		message []byte
 		err     error
@@ -179,7 +168,7 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 		}
 
 		if c.middleware != nil {
-			if err = c.middleware(); err != nil {
+			if err = c.middleware(message); err != nil {
 				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
 				c.reportError(err)
 				continue
@@ -225,12 +214,10 @@ func (c *Client) handleIncomingUpdates(errChannel chan error) {
 			continue
 		}
 		c.handlersLocker.Unlock()
-
-		c.updates <- update
 	}
 }
 
-func (c *Client) close() error {
+func (c *Connection) close() error {
 	defer func() {
 		c.closed <- true
 	}()

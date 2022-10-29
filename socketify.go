@@ -5,20 +5,20 @@ import (
 	"net/http"
 )
 
-type Socketify struct {
+type Server struct {
 	opts    *options
 	upgrade *websocket.Upgrader
 	server  *http.Server
-	clients chan *Client
+	clients chan *Connection
 	storage *storage
 }
 
-func New(opts *options) (s *Socketify) {
+func New(opts *options) (s *Server) {
 	if opts == nil {
 		opts = defaultOptions()
-	} else {
-		opts.fillDefaults()
 	}
+
+	opts.fillDefaults()
 
 	var upgrade = &websocket.Upgrader{CheckOrigin: func(r *http.Request) bool {
 		return true
@@ -33,31 +33,31 @@ func New(opts *options) (s *Socketify) {
 		storage = newStorage()
 	}
 
-	s = &Socketify{
+	s = &Server{
 		opts:    opts,
 		server:  &http.Server{Addr: opts.address, Handler: opts.serveMux},
 		upgrade: upgrade,
-		clients: make(chan *Client),
+		clients: make(chan *Connection),
 		storage: storage,
 	}
 
 	return
 }
 
-func (s *Socketify) Listen() (err error) {
+func (s *Server) Listen() (err error) {
 	s.opts.serveMux.HandleFunc(s.opts.endpoint, s.websocketUpgrade)
 	err = s.server.ListenAndServe()
 	return
 }
 
-func (s *Socketify) Server() (server *http.Server) {
+func (s *Server) Server() (server *http.Server) {
 	return s.server
 }
 
-func (s *Socketify) Storage() *storage {
+func (s *Server) Storage() *storage {
 	return s.storage
 }
 
-func (s *Socketify) Clients() chan *Client {
+func (s *Server) Clients() chan *Connection {
 	return s.clients
 }
