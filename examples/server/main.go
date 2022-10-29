@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	server := socketify.New(socketify.Options().SetAddress(":8080").SetEndpoint("/").IgnoreCheckOrigin())
+	server := socketify.NewServer(socketify.ServerOptions().SetAddress(":8080").SetEndpoint("/").IgnoreCheckOrigin())
 	go server.Listen()
 
 	for client := range server.Clients() {

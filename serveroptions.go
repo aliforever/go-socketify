@@ -29,7 +29,7 @@ func defaultOptions() *options {
 	}
 }
 
-func Options() *options {
+func ServerOptions() *options {
 	return &options{}
 }
 

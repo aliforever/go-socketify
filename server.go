@@ -13,7 +13,7 @@ type Server struct {
 	storage *storage
 }
 
-func New(opts *options) (s *Server) {
+func NewServer(opts *options) (s *Server) {
 	if opts == nil {
 		opts = defaultOptions()
 	}
