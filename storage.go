@@ -38,17 +38,6 @@ func (s *storage) GetClientsByAttributeValue(key, value string) []*Connection {
 	return clients
 }
 
-// SetClientForID Important: Don't use this method if you're not sure what you're doing
-// This might replace the client with an existing alive client
-func (s *storage) SetClientForID(id string, client *Connection) {
-	s.m.Lock()
-	defer s.m.Unlock()
-
-	delete(s.clients, client.id)
-	client.id = id
-	s.clients[id] = client
-}
-
 func (s *storage) ClientIDs() (ids []string) {
 	s.m.Lock()
 	defer s.m.Unlock()
