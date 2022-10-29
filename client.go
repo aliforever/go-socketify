@@ -114,5 +114,6 @@ func (c *Client) processUpdates() {
 			go handler(u.Data)
 			continue
 		}
+		c.handlersLock.Unlock()
 	}
 }
