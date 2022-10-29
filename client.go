@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"github.com/teris-io/shortid"
 	"net/http"
 	"sync"
 	"time"
@@ -31,8 +32,13 @@ type Connection struct {
 }
 
 func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request) (c *Connection) {
+	id := server.opts.idFunc(upgradeRequest)
+	if id == "" {
+		id = shortid.MustGenerate()
+	}
+
 	c = &Connection{
-		id:              server.opts.idFunc(upgradeRequest),
+		id:              id,
 		server:          server,
 		ws:              ws,
 		writer:          make(chan messageType),
