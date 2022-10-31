@@ -60,6 +60,12 @@ func (c *Client) SetOnError(fn func(err error)) *Client {
 	return c
 }
 
+func (c *Client) SetOnClose(fn func(err error)) *Client {
+	c.onClose = fn
+
+	return c
+}
+
 func (c *Client) Connect() error {
 	conn, _, err := websocket.DefaultDialer.Dial(c.address, nil)
 	if err != nil {
