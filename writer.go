@@ -6,53 +6,84 @@ import (
 	"time"
 )
 
-func (c *Connection) WriteInternalUpdate(update []byte) {
-	c.internalUpdates <- update
-	// TODO: Decide to move this to goroutine or not, because people might forget to do so in their application leading \
-	//  to a deadlock
+type writer struct {
+	ch     chan messageType
+	logger Logger
 }
 
-func (c *Connection) WriteUpdate(updateType string, data interface{}) (err error) {
+func newWriter(ch chan messageType, logger Logger) *writer {
+	w := &writer{ch: ch, logger: logger}
+	return w
+}
+
+func (w *writer) WriteUpdate(updateType string, data interface{}) (err error) {
 	jm := newJSONMessage(serverUpdate{
 		Type: updateType,
 		Data: data,
 	})
 
-	c.writer <- jm
+	w.ch <- jm
 
 	return <-jm.err
 }
 
-func (c *Connection) WriteRawUpdate(data interface{}) (err error) {
+func (w *writer) WriteRawUpdate(data interface{}) (err error) {
 	jm := newJSONMessage(data)
 
-	c.writer <- jm
+	w.ch <- jm
 
 	return <-jm.err
 }
 
-func (c *Connection) WriteBinaryBytes(data []byte) (err error) {
+func (w *writer) WriteBinaryBytes(data []byte) (err error) {
 	jm := newBinaryMessage(data)
 
-	c.writer <- jm
+	w.ch <- jm
 
 	return <-jm.err
 }
 
-func (c *Connection) WriteBinaryText(data []byte) (err error) {
+func (w *writer) WriteBinaryText(data []byte) (err error) {
 	jm := newBinaryTextMessage(data)
 
-	c.writer <- jm
+	w.ch <- jm
 
 	return <-jm.err
 }
 
-func (c *Connection) WriteText(data string) (err error) {
+func (w *writer) WriteText(data string) (err error) {
 	jm := newTextMessage(data)
 
-	c.writer <- jm
+	w.ch <- jm
 
 	return <-jm.err
+}
+
+func (w *writer) processWriter(ws *websocket.Conn) {
+	for update := range w.ch {
+		data, err := update.Data()
+		if err != nil {
+			go func(update messageType, err error) {
+				update.Err() <- err
+			}(update, err)
+			w.logger.Error("Error getting message data", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, ws.RemoteAddr().String()))
+			continue
+		}
+
+		err = ws.WriteMessage(update.Type(), data)
+		if err != nil {
+			w.logger.Error("Error writing JSON", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, ws.RemoteAddr().String()))
+		}
+		go func(update messageType, err error) {
+			update.Err() <- err
+		}(update, err)
+	}
+}
+
+func (c *Connection) WriteInternalUpdate(update []byte) {
+	c.internalUpdates <- update
+	// TODO: Decide to move this to goroutine or not, because people might forget to do so in their application leading \
+	//  to a deadlock
 }
 
 func (c *Connection) ping() {
@@ -64,26 +95,5 @@ func (c *Connection) ping() {
 				return
 			}
 		}
-	}
-}
-
-func (c *Connection) processWriter() {
-	for update := range c.writer {
-		data, err := update.Data()
-		if err != nil {
-			go func(update messageType, err error) {
-				update.Err() <- err
-			}(update, err)
-			c.server.opts.logger.Error("Error getting message data", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, c.ws.RemoteAddr().String()))
-			continue
-		}
-
-		err = c.ws.WriteMessage(update.Type(), data)
-		if err != nil {
-			c.server.opts.logger.Error("Error writing JSON", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, c.ws.RemoteAddr().String()))
-		}
-		go func(update messageType, err error) {
-			update.Err() <- err
-		}(update, err)
 	}
 }

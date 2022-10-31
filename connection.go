@@ -12,11 +12,12 @@ import (
 )
 
 type Connection struct {
+	*writer
+
 	id                  string
 	server              *Server
 	ws                  *websocket.Conn
 	internalUpdates     chan []byte
-	writer              chan messageType
 	handlers            map[string]func(json.RawMessage)
 	rawHandler          func(message []byte)
 	handlersLocker      sync.Mutex
@@ -37,11 +38,13 @@ func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Requ
 		id = shortid.MustGenerate()
 	}
 
+	wr := make(chan messageType)
+
 	c = &Connection{
 		id:              id,
 		server:          server,
 		ws:              ws,
-		writer:          make(chan messageType),
+		writer:          newWriter(wr, server.opts.logger),
 		handlers:        map[string]func(message json.RawMessage){},
 		closed:          make(chan bool),
 		upgradeRequest:  upgradeRequest,
@@ -50,7 +53,7 @@ func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Requ
 		clientErrors:    make(chan error),
 	}
 
-	go c.processWriter()
+	go c.processWriter(ws)
 
 	return
 }

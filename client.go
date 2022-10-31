@@ -8,11 +8,14 @@ import (
 )
 
 type Client struct {
-	address string
-	ws      *websocket.Conn
+	*writer
 
+	address string
+
+	ws           *websocket.Conn
 	handlersLock sync.Mutex
-	handlers     map[string]func(json.RawMessage)
+
+	handlers map[string]func(json.RawMessage)
 
 	rawHandler func(message []byte)
 
@@ -24,11 +27,16 @@ type Client struct {
 }
 
 func NewClient(address string) *Client {
-	return &Client{
+	ch := make(chan messageType)
+
+	cl := &Client{
 		address:  address,
 		handlers: map[string]func(json.RawMessage){},
 		closed:   make(chan bool),
+		writer:   newWriter(ch, logger{}),
 	}
+
+	return cl
 }
 
 func (c *Client) SetRawHandler(fn func(message []byte)) *Client {
@@ -59,6 +67,8 @@ func (c *Client) Connect() error {
 	}
 
 	c.ws = conn
+
+	go c.writer.processWriter(conn)
 
 	go c.processUpdates()
 
