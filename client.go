@@ -24,6 +24,8 @@ type Client struct {
 	closed chan bool
 
 	onClose func(err error)
+
+	rawMiddleware func(update []byte)
 }
 
 func NewClient(address string) *Client {
@@ -41,6 +43,12 @@ func NewClient(address string) *Client {
 
 func (c *Client) SetRawHandler(fn func(message []byte)) *Client {
 	c.rawHandler = fn
+
+	return c
+}
+
+func (c *Client) SetRawMiddleware(fn func(message []byte)) *Client {
+	c.rawMiddleware = fn
 
 	return c
 }
@@ -110,6 +118,10 @@ func (c *Client) processUpdates() {
 			go c.handlerErr(err)
 			go c.close(err)
 			return
+		}
+
+		if c.rawMiddleware != nil {
+			go c.rawMiddleware(message)
 		}
 
 		if c.rawHandler != nil {
