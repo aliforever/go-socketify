@@ -1,7 +1,6 @@
 package socketify
 
 import (
-	"github.com/teris-io/shortid"
 	"net/http"
 )
 
@@ -17,7 +16,7 @@ type options struct {
 	checkOrigin   func(r *http.Request) bool
 	logger        Logger
 	enableStorage bool
-	idFunc        func(r *http.Request) string
+	onConnect     func(wr http.ResponseWriter, r *http.Request) (connectionID string, err error)
 }
 
 func defaultOptions() *options {
@@ -33,8 +32,8 @@ func ServerOptions() *options {
 	return &options{}
 }
 
-func (o *options) SetIdSetterFunction(fn func(r *http.Request) string) *options {
-	o.idFunc = fn
+func (o *options) SetOnConnect(fn func(wr http.ResponseWriter, r *http.Request) (string, error)) *options {
+	o.onConnect = fn
 	return o
 }
 
@@ -87,10 +86,5 @@ func (o *options) fillDefaults() {
 	}
 	if o.logger == nil {
 		o.logger = logger{}
-	}
-	if o.idFunc == nil {
-		o.idFunc = func(_ *http.Request) string {
-			return shortid.MustGenerate()
-		}
 	}
 }

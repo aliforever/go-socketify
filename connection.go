@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"github.com/teris-io/shortid"
 	"net/http"
 	"sync"
 	"time"
@@ -31,14 +30,9 @@ type Connection struct {
 	clientErrors        chan error
 }
 
-func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request) (c *Connection) {
-	id := server.opts.idFunc(upgradeRequest)
-	if id == "" {
-		id = shortid.MustGenerate()
-	}
-
+func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request, clientID string) (c *Connection) {
 	c = &Connection{
-		id:              id,
+		id:              clientID,
 		server:          server,
 		ws:              ws,
 		writer:          make(chan messageType),
