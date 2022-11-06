@@ -8,11 +8,14 @@ import (
 )
 
 type Client struct {
-	address string
-	ws      *websocket.Conn
+	*writer
 
+	address string
+
+	ws           *websocket.Conn
 	handlersLock sync.Mutex
-	handlers     map[string]func(json.RawMessage)
+
+	handlers map[string]func(json.RawMessage)
 
 	rawHandler func(message []byte)
 
@@ -21,18 +24,31 @@ type Client struct {
 	closed chan bool
 
 	onClose func(err error)
+
+	rawMiddleware func(update []byte)
 }
 
 func NewClient(address string) *Client {
-	return &Client{
+	ch := make(chan messageType)
+
+	cl := &Client{
 		address:  address,
 		handlers: map[string]func(json.RawMessage){},
 		closed:   make(chan bool),
+		writer:   newWriter(ch, logger{}),
 	}
+
+	return cl
 }
 
 func (c *Client) SetRawHandler(fn func(message []byte)) *Client {
 	c.rawHandler = fn
+
+	return c
+}
+
+func (c *Client) SetRawMiddleware(fn func(message []byte)) *Client {
+	c.rawMiddleware = fn
 
 	return c
 }
@@ -52,6 +68,12 @@ func (c *Client) SetOnError(fn func(err error)) *Client {
 	return c
 }
 
+func (c *Client) SetOnClose(fn func(err error)) *Client {
+	c.onClose = fn
+
+	return c
+}
+
 func (c *Client) Connect() error {
 	conn, _, err := websocket.DefaultDialer.Dial(c.address, nil)
 	if err != nil {
@@ -59,6 +81,8 @@ func (c *Client) Connect() error {
 	}
 
 	c.ws = conn
+
+	go c.writer.processWriter(conn)
 
 	go c.processUpdates()
 
@@ -94,6 +118,10 @@ func (c *Client) processUpdates() {
 			go c.handlerErr(err)
 			go c.close(err)
 			return
+		}
+
+		if c.rawMiddleware != nil {
+			go c.rawMiddleware(message)
 		}
 
 		if c.rawHandler != nil {
