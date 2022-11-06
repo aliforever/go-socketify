@@ -7,8 +7,8 @@ A simple WebSocket framework for Go
 ## Usage
 A simple app that PONG when PING
 ```go
-options := socketify.Options().SetAddress(":8080").SetEndpoint("/ws").IgnoreCheckOrigin()
-server := socketify.New(options)
+options := socketify.ServerOptions().SetAddress(":8080").SetEndpoint("/ws").IgnoreCheckOrigin()
+server := socketify.Server(options)
 go server.Listen()
 
 for client := range server.Clients() {
