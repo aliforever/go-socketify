@@ -32,6 +32,8 @@ type Connection struct {
 }
 
 func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request, clientID string) (c *Connection) {
+	wr := make(chan messageType)
+
 	c = &Connection{
 		id:              clientID,
 		server:          server,
