@@ -22,7 +22,7 @@ type Connection struct {
 	handlersLocker      sync.Mutex
 	upgradeRequest      *http.Request
 	closed              chan bool
-	attributes          map[string]string
+	attributes          map[string]interface{}
 	attributesLocker    sync.Mutex
 	onClose             func()
 	keepAlive           time.Duration
@@ -42,7 +42,7 @@ func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Requ
 		handlers:        map[string]func(message json.RawMessage){},
 		closed:          make(chan bool),
 		upgradeRequest:  upgradeRequest,
-		attributes:      map[string]string{},
+		attributes:      map[string]interface{}{},
 		internalUpdates: make(chan []byte),
 		clientErrors:    make(chan error),
 	}
@@ -72,14 +72,14 @@ func (c *Connection) SetOnClose(onClose func()) {
 	c.onClose = onClose
 }
 
-func (c *Connection) SetAttribute(key, val string) {
+func (c *Connection) SetAttribute(key string, val interface{}) {
 	c.attributesLocker.Lock()
 	defer c.attributesLocker.Unlock()
 
 	c.attributes[key] = val
 }
 
-func (c *Connection) GetAttribute(key string) (val string, exists bool) {
+func (c *Connection) GetAttribute(key string) (val interface{}, exists bool) {
 	c.attributesLocker.Lock()
 	defer c.attributesLocker.Unlock()
 
