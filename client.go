@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"io"
 	"sync"
 )
 
@@ -72,6 +73,10 @@ func (c *Client) SetOnClose(fn func(err error)) *Client {
 	c.onClose = fn
 
 	return c
+}
+
+func (c *Client) NextReader() (messageType int, r io.Reader, err error) {
+	return c.ws.NextReader()
 }
 
 func (c *Client) Connect() error {
