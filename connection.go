@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gorilla/websocket"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -131,6 +132,10 @@ func (c *Connection) HandleUpdate(updateType string, handler func(message json.R
 
 func (c *Connection) Server() *Server {
 	return c.server
+}
+
+func (c *Connection) NextReader() (messageType int, r io.Reader, err error) {
+	return c.ws.NextReader()
 }
 
 func (c *Connection) Close() error {
