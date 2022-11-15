@@ -29,7 +29,7 @@ type Client struct {
 	rawMiddleware func(update []byte)
 }
 
-func NewClient(address string) *Client {
+func NewClient(address string) (*Client, error) {
 	ch := make(chan messageType)
 
 	cl := &Client{
@@ -39,7 +39,18 @@ func NewClient(address string) *Client {
 		writer:   newWriter(ch, logger{}),
 	}
 
-	return cl
+	conn, _, err := websocket.DefaultDialer.Dial(address, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	cl.ws = conn
+
+	go cl.writer.processWriter(conn)
+
+	go cl.processUpdates()
+
+	return cl, nil
 }
 
 func (c *Client) SetRawHandler(fn func(message []byte)) *Client {
@@ -77,23 +88,6 @@ func (c *Client) SetOnClose(fn func(err error)) *Client {
 
 func (c *Client) NextReader() (messageType int, r io.Reader, err error) {
 	return c.ws.NextReader()
-}
-
-func (c *Client) Connect() error {
-	conn, _, err := websocket.DefaultDialer.Dial(c.address, nil)
-	if err != nil {
-		return err
-	}
-
-	c.ws = conn
-
-	go c.writer.processWriter(conn)
-
-	go c.processUpdates()
-
-	<-c.closed
-
-	return fmt.Errorf("connection_closed")
 }
 
 func (c *Client) Close() {
