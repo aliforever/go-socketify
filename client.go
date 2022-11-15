@@ -90,6 +90,14 @@ func (c *Client) NextReader() (messageType int, r io.Reader, err error) {
 	return c.ws.NextReader()
 }
 
+func (c *Client) NextWriterBinary() (r io.Writer, err error) {
+	return c.ws.NextWriter(websocket.BinaryMessage)
+}
+
+func (c *Client) NextWriterText() (r io.Writer, err error) {
+	return c.ws.NextWriter(websocket.TextMessage)
+}
+
 func (c *Client) Close() {
 	c.close(fmt.Errorf("manually_called_close"))
 }
