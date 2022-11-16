@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"io"
+	"net/http"
 	"sync"
 )
 
@@ -22,8 +23,6 @@ type Client struct {
 
 	onErr func(err error)
 
-	closed chan bool
-
 	onClose func(err error)
 
 	rawMiddleware func(update []byte)
@@ -35,7 +34,6 @@ func NewClient(address string) (*Client, error) {
 	cl := &Client{
 		address:  address,
 		handlers: map[string]func(json.RawMessage){},
-		closed:   make(chan bool),
 		writer:   newWriter(ch, logger{}),
 	}
 
@@ -102,17 +100,20 @@ func (c *Client) NextWriterCloseMessage() (r io.Writer, err error) {
 	return c.ws.NextWriter(websocket.CloseMessage)
 }
 
-func (c *Client) Close() {
-	c.close(fmt.Errorf("manually_called_close"))
+func (c *Client) Close(code int, message string) {
+	c.close(code, message)
 }
 
-func (c *Client) close(err error) {
+func (c *Client) close(code int, message string) {
 	defer c.ws.Close()
 
-	c.closed <- true
+	r, err := c.NextWriterCloseMessage()
+	if err == nil {
+		_, _ = r.Write(websocket.FormatCloseMessage(code, message))
+	}
 
 	if c.onClose != nil {
-		c.onClose(err)
+		go c.onClose(fmt.Errorf(message))
 	}
 }
 
@@ -127,7 +128,7 @@ func (c *Client) processUpdates() {
 		_, message, err := c.ws.ReadMessage()
 		if err != nil {
 			go c.handlerErr(err)
-			go c.close(err)
+			go c.close(http.StatusInternalServerError, err.Error())
 			return
 		}
 
