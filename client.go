@@ -98,6 +98,10 @@ func (c *Client) NextWriterText() (r io.Writer, err error) {
 	return c.ws.NextWriter(websocket.TextMessage)
 }
 
+func (c *Client) NextWriterCloseMessage() (r io.Writer, err error) {
+	return c.ws.NextWriter(websocket.CloseMessage)
+}
+
 func (c *Client) Close() {
 	c.close(fmt.Errorf("manually_called_close"))
 }
