@@ -11,11 +11,11 @@ options := socketify.ServerOptions().SetAddress(":8080").SetEndpoint("/ws").Igno
 server := socketify.Server(options)
 go server.Listen()
 
-for client := range server.Clients() {
-    client.HandleUpdate("PING", func(message json.RawMessage) {
-        client.WriteUpdate("PONG", nil)
+for connection := range server.Connections() {
+    connection.HandleUpdate("PING", func(message json.RawMessage) {
+        connection.WriteUpdate("PONG", nil)
     })
-    go client.ProcessUpdates()
+    go connection.ProcessUpdates()
 }
 ```
 Run the application and send below JSON to "ws://127.0.0.1:8080/ws":

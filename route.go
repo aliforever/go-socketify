@@ -40,5 +40,5 @@ func (s *Server) websocketUpgrade(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.clients <- client
+	s.connections <- client
 }

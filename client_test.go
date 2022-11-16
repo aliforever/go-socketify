@@ -98,7 +98,7 @@ func runServer() {
 		}
 	}()
 
-	for client := range s.Clients() {
+	for client := range s.Connections() {
 		client.HandleRawUpdate(func(message []byte) {
 			fmt.Println(string(message))
 			if string(message) == "Hello" {

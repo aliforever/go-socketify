@@ -138,6 +138,18 @@ func (c *Connection) NextReader() (messageType int, r io.Reader, err error) {
 	return c.ws.NextReader()
 }
 
+func (c *Connection) NextWriterBinary() (r io.Writer, err error) {
+	return c.ws.NextWriter(websocket.BinaryMessage)
+}
+
+func (c *Connection) NextWriterText() (r io.Writer, err error) {
+	return c.ws.NextWriter(websocket.TextMessage)
+}
+
+func (c *Connection) NextWriterCloseMessage() (r io.Writer, err error) {
+	return c.ws.NextWriter(websocket.CloseMessage)
+}
+
 func (c *Connection) Close() error {
 	return c.close()
 }
