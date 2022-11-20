@@ -1,6 +1,7 @@
 package socketify
 
 import (
+	"crypto/rsa"
 	"net/http"
 )
 
@@ -17,6 +18,7 @@ type options struct {
 	logger        Logger
 	enableStorage bool
 	onConnect     func(wr http.ResponseWriter, r *http.Request) (connectionID string, attributes map[string]interface{}, err error)
+	encryption    *encryption
 }
 
 func defaultOptions() *options {
@@ -71,6 +73,15 @@ func (o *options) IgnoreCheckOrigin() *options {
 
 func (o *options) EnableStorage() *options {
 	o.enableStorage = true
+	return o
+}
+
+func (o *options) EnableRsaAesEncryption(publicKeyPemFn func() (*rsa.PrivateKey, error)) *options {
+	o.encryption = &encryption{
+		Method: EncryptionTypeRsaAes,
+		rsaAes: &encryptionRsaAes{privateKey: publicKeyPemFn},
+	}
+
 	return o
 }
 

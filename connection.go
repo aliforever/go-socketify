@@ -30,22 +30,24 @@ type Connection struct {
 	middleware          func(message []byte) error
 	middlewareForUpdate func(updateType string, data json.RawMessage) error
 	clientErrors        chan error
+	encryptionFields    *encryptionFields
 }
 
-func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request, clientID string) (c *Connection) {
+func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request, clientID string, encryptionFields *encryptionFields) (c *Connection) {
 	wr := make(chan messageType)
 
 	c = &Connection{
-		id:              clientID,
-		server:          server,
-		ws:              ws,
-		writer:          newWriter(wr, server.opts.logger),
-		handlers:        map[string]func(message json.RawMessage){},
-		closed:          make(chan bool),
-		upgradeRequest:  upgradeRequest,
-		attributes:      map[string]interface{}{},
-		internalUpdates: make(chan []byte),
-		clientErrors:    make(chan error),
+		id:               clientID,
+		server:           server,
+		ws:               ws,
+		writer:           newWriter(wr, server.opts.logger),
+		handlers:         map[string]func(message json.RawMessage){},
+		closed:           make(chan bool),
+		upgradeRequest:   upgradeRequest,
+		attributes:       map[string]interface{}{},
+		internalUpdates:  make(chan []byte),
+		clientErrors:     make(chan error),
+		encryptionFields: encryptionFields,
 	}
 
 	go c.processWriter(ws)
@@ -195,13 +197,10 @@ func (c *Connection) handleIncomingUpdates(errChannel chan error) {
 			}
 		}
 
-		c.handlersLocker.Lock()
-		if c.rawHandler != nil {
-			c.rawHandler(message)
-			c.handlersLocker.Unlock()
+		if rawHandler := c.getRawHandler(); rawHandler != nil {
+			rawHandler(message)
 			continue
 		}
-		c.handlersLocker.Unlock()
 
 		var update *Update
 		jsonErr := json.Unmarshal(message, &update)
@@ -227,14 +226,33 @@ func (c *Connection) handleIncomingUpdates(errChannel chan error) {
 
 		// Check if there's a default handler registered for the updateType and call it
 		// If any handlers found, the update will be processed by that handler and won't be passed to the updates channel
-		c.handlersLocker.Lock()
-		if handler, ok := c.handlers[update.Type]; ok {
-			c.handlersLocker.Unlock()
+		if handler := c.getHandlerByType(update.Type); handler != nil {
 			handler(update.Data)
 			continue
 		}
-		c.handlersLocker.Unlock()
 	}
+}
+
+func (c *Connection) getRawHandler() func(message []byte) {
+	c.handlersLocker.Lock()
+	defer c.handlersLocker.Unlock()
+
+	if handler := c.rawHandler; handler != nil {
+		return handler
+	}
+
+	return nil
+}
+
+func (c *Connection) getHandlerByType(t string) func(message json.RawMessage) {
+	c.handlersLocker.Lock()
+	defer c.handlersLocker.Unlock()
+
+	if handler := c.handlers[t]; handler != nil {
+		return handler
+	}
+
+	return nil
 }
 
 func (c *Connection) close() error {

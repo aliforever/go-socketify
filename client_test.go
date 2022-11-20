@@ -31,15 +31,25 @@ func TestNewClient(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := socketify.NewClient(tt.args.address)
+			ch := make(chan bool)
+
+			got, _ := socketify.NewClient(tt.args.address)
 
 			got.SetRawHandler(func(message []byte) {
 				fmt.Println("received", string(message), "and closing...")
-				got.Close()
+				got.Close(200, "close")
 			})
 
-			err := got.Connect()
-			assert.ErrorContains(t, err, "close")
+			var receivedErr error
+
+			got.SetOnClose(func(err error) {
+				fmt.Println("received error", err)
+				receivedErr = err
+				ch <- true
+			})
+
+			<-ch
+			assert.ErrorContains(t, receivedErr, "close")
 		})
 	}
 }
@@ -68,22 +78,30 @@ func TestNewClientWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := socketify.NewClient(tt.args.address)
+			got, _ := socketify.NewClient(tt.args.address)
+
+			var wait = make(chan bool)
+
+			var receivedErr error
 
 			got.SetRawHandler(func(message []byte) {
 				if string(message) == "Hello" {
 					fmt.Println("received", string(message), "and closing...")
-					got.Close()
+					got.Close(200, "bye")
 				} else {
 					fmt.Println("received", string(message))
 				}
+			})
 
+			got.SetOnClose(func(err error) {
+				receivedErr = err
+				wait <- true
 			})
 
 			go got.WriteText("Hello")
 
-			err := got.Connect()
-			assert.ErrorContains(t, err, "close")
+			<-wait
+			assert.ErrorContains(t, receivedErr, "bye")
 		})
 	}
 }
