@@ -18,7 +18,7 @@ type Connection struct {
 	server              *Server
 	ws                  *websocket.Conn
 	internalUpdates     chan []byte
-	handlers            map[string]func(json.RawMessage)
+	handlers            map[string]mapper
 	rawHandler          func(message []byte)
 	handlersLocker      sync.Mutex
 	upgradeRequest      *http.Request
@@ -41,7 +41,7 @@ func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Requ
 		server:           server,
 		ws:               ws,
 		writer:           newWriter(wr, server.opts.logger),
-		handlers:         map[string]func(message json.RawMessage){},
+		handlers:         map[string]mapper{},
 		closed:           make(chan bool),
 		upgradeRequest:   upgradeRequest,
 		attributes:       map[string]interface{}{},
@@ -125,8 +125,9 @@ func (c *Connection) HandleRawUpdate(handler func(message []byte)) {
 }
 
 // HandleUpdate registers a default handler for updateType
+// For the second argument you should pass your handler inside DataMapper as follows: socketify.DataMapper[T](handler)
 // Care: If you use this method for an updateType, you won't receive the respected update in your listener
-func (c *Connection) HandleUpdate(updateType string, handler func(message json.RawMessage)) {
+func (c *Connection) HandleUpdate(updateType string, handler mapper) {
 	c.handlersLocker.Lock()
 	defer c.handlersLocker.Unlock()
 	c.handlers[updateType] = handler
@@ -244,7 +245,7 @@ func (c *Connection) getRawHandler() func(message []byte) {
 	return nil
 }
 
-func (c *Connection) getHandlerByType(t string) func(message json.RawMessage) {
+func (c *Connection) getHandlerByType(t string) mapper {
 	c.handlersLocker.Lock()
 	defer c.handlersLocker.Unlock()
 
