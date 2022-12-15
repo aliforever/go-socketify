@@ -126,6 +126,7 @@ func (c *Connection) HandleRawUpdate(handler func(message []byte)) {
 
 // HandleUpdate registers a default handler for updateType
 // For the second argument you should pass your handler inside DataMapper as follows: socketify.DataMapper[T](handler)
+// If the input is going to be empty (update.data == nil) then you can pass socketify.EmptyInput as input
 // Care: If you use this method for an updateType, you won't receive the respected update in your listener
 func (c *Connection) HandleUpdate(updateType string, handler mapper) {
 	c.handlersLocker.Lock()

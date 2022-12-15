@@ -8,13 +8,13 @@ A simple WebSocket framework for Go
 A simple app that PONG when PING
 ```go
 options := socketify.ServerOptions().SetAddress(":8080").SetEndpoint("/ws").IgnoreCheckOrigin()
-server := socketify.Server(options)
+server := socketify.NewServer(options)
 go server.Listen()
 
 for connection := range server.Connections() {
-    connection.HandleUpdate("PING", func(message json.RawMessage) {
+    connection.HandleUpdate("PING", socketify.NewMapper[socketify.EmptyInput](func(_ socketify.EmptyInput) {
         connection.WriteUpdate("PONG", nil)
-    })
+    }))
     go connection.ProcessUpdates()
 }
 ```
