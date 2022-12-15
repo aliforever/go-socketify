@@ -71,7 +71,6 @@ func (w *writer) processWriter(ws *websocket.Conn) {
 		}
 
 		// TODO: Encrypt Message if this is an encrypted connection
-
 		err = ws.WriteMessage(update.Type(), data)
 		if err != nil {
 			w.logger.Error("Error writing JSON", err, fmt.Sprintf("update: %+v . RemoteAddr: %s", update, ws.RemoteAddr().String()))
