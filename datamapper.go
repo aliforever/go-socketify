@@ -11,7 +11,7 @@ type mapper interface {
 }
 
 type dataMapper[T any] struct {
-	handler func(T) error
+	handler func(T, ...string) error
 }
 
 func (u dataMapper[T]) Handle(data json.RawMessage) error {
@@ -27,6 +27,6 @@ func (u dataMapper[T]) Handle(data json.RawMessage) error {
 	return u.handler(t)
 }
 
-func DataMapper[T any](handler func(T) error) dataMapper[T] {
+func DataMapper[T any](handler func(T, ...string) error) dataMapper[T] {
 	return dataMapper[T]{handler: handler}
 }

@@ -29,7 +29,7 @@ type Connection struct {
 	keepAlive           time.Duration
 	middleware          func(message []byte) error
 	middlewareForUpdate func(updateType string, data json.RawMessage) error
-	clientErrors        chan error
+	clientErrors        chan UpdateError
 	encryptionFields    *encryptionFields
 }
 
@@ -46,7 +46,7 @@ func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Requ
 		upgradeRequest:   upgradeRequest,
 		attributes:       map[string]interface{}{},
 		internalUpdates:  make(chan []byte),
-		clientErrors:     make(chan error),
+		clientErrors:     make(chan UpdateError),
 		encryptionFields: encryptionFields,
 	}
 
@@ -94,7 +94,7 @@ func (c *Connection) UpgradeRequest() *http.Request {
 	return c.upgradeRequest
 }
 
-func (c *Connection) Errors() <-chan error {
+func (c *Connection) Errors() <-chan UpdateError {
 	return c.clientErrors
 }
 
@@ -158,9 +158,9 @@ func (c *Connection) Close() error {
 	return c.close()
 }
 
-func (c *Connection) reportError(err error) {
+func (c *Connection) reportError(update []byte, err error, extra ...string) {
 	go func() {
-		c.clientErrors <- err
+		c.clientErrors <- newUpdateError(update, err, extra...)
 	}()
 }
 
@@ -187,14 +187,14 @@ func (c *Connection) handleIncomingUpdates(errChannel chan error) {
 		if err != nil {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Reading Message: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
 			errChannel <- err
-			c.reportError(err)
+			c.reportError(message, err)
 			return
 		}
 
 		if c.middleware != nil {
 			if err = c.middleware(message); err != nil {
 				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
-				c.reportError(err)
+				c.reportError(message, err)
 				continue
 			}
 		}
@@ -208,20 +208,20 @@ func (c *Connection) handleIncomingUpdates(errChannel chan error) {
 		jsonErr := json.Unmarshal(message, &update)
 		if jsonErr != nil {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Unmarshalling Request: %s. Data: %s. RemoteAddr: %s", jsonErr, message, c.ws.RemoteAddr().String()))
-			c.reportError(jsonErr)
+			c.reportError(message, jsonErr)
 			continue
 		}
 
 		if update.Type == "" {
 			c.server.opts.logger.Error(fmt.Sprintf("Error Due to Empty Update Type. Data: %s. RemoteAddr: %s", message, c.ws.RemoteAddr().String()))
-			c.reportError(errors.New("empty update type"))
+			c.reportError(message, errors.New("empty update type"), update.Extra)
 			continue
 		}
 
 		if c.middlewareForUpdate != nil {
 			if err := c.middlewareForUpdate(update.Type, update.Data); err != nil {
 				c.server.opts.logger.Error(fmt.Sprintf("Error From Middleware: %s. RemoteAddr: %s", err, c.ws.RemoteAddr().String()))
-				c.reportError(err)
+				c.reportError(message, err, update.Extra)
 				continue
 			}
 		}
@@ -229,7 +229,11 @@ func (c *Connection) handleIncomingUpdates(errChannel chan error) {
 		// Check if there's a default handler registered for the updateType and call it
 		// If any handlers found, the update will be processed by that handler and won't be passed to the updates channel
 		if handler := c.getHandlerByType(update.Type); handler != nil {
-			handler(update.Data)
+			err = handler.Handle(update.Data)
+			if err != nil {
+				c.server.opts.logger.Error(fmt.Sprintf("Error handling event: %s : %s from %s", string(message), err, c.ws.RemoteAddr().String()))
+				c.reportError(message, err, update.Extra)
+			}
 			continue
 		}
 	}
