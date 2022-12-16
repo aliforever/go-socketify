@@ -3,6 +3,7 @@ package socketify
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
+	"strings"
 	"time"
 )
 
@@ -16,11 +17,16 @@ func newWriter(ch chan messageType, logger Logger) *writer {
 	return w
 }
 
-func (w *writer) WriteUpdate(updateType string, data interface{}) (err error) {
-	jm := newJSONMessage(serverUpdate{
+func (w *writer) WriteUpdate(updateType string, data interface{}, extra ...string) (err error) {
+	su := serverUpdate{
 		Type: updateType,
 		Data: data,
-	})
+	}
+	if len(extra) > 0 {
+		su.Extra = strings.Join(extra, "_")
+	}
+
+	jm := newJSONMessage(su)
 
 	w.ch <- jm
 
