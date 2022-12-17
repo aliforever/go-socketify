@@ -17,7 +17,6 @@ type options struct {
 	checkOrigin   func(r *http.Request) bool
 	logger        Logger
 	enableStorage bool
-	onConnect     func(wr http.ResponseWriter, r *http.Request) (connectionID string, attributes map[string]interface{}, err error)
 	encryption    *encryption
 }
 
@@ -32,11 +31,6 @@ func defaultOptions() *options {
 
 func ServerOptions() *options {
 	return &options{}
-}
-
-func (o *options) SetOnConnect(fn func(wr http.ResponseWriter, r *http.Request) (string, map[string]interface{}, error)) *options {
-	o.onConnect = fn
-	return o
 }
 
 func (o *options) SetEndpoint(endpoint string) *options {
