@@ -6,11 +6,11 @@ import (
 )
 
 type Server struct {
-	opts        *options
-	upgrade     *websocket.Upgrader
-	server      *http.Server
-	connections chan *Connection
-	storage     *storage
+	opts            *options
+	upgrade         *websocket.Upgrader
+	server          *http.Server
+	upgradeRequests chan *UpgradeRequest
+	storage         *storage
 }
 
 func NewServer(opts *options) (s *Server) {
@@ -34,11 +34,11 @@ func NewServer(opts *options) (s *Server) {
 	}
 
 	s = &Server{
-		opts:        opts,
-		server:      &http.Server{Addr: opts.address, Handler: opts.serveMux},
-		upgrade:     upgrade,
-		connections: make(chan *Connection),
-		storage:     storage,
+		opts:            opts,
+		server:          &http.Server{Addr: opts.address, Handler: opts.serveMux},
+		upgrade:         upgrade,
+		upgradeRequests: make(chan *UpgradeRequest),
+		storage:         storage,
 	}
 
 	return
@@ -58,6 +58,6 @@ func (s *Server) Storage() *storage {
 	return s.storage
 }
 
-func (s *Server) Connections() chan *Connection {
-	return s.connections
+func (s *Server) UpgradeRequests() chan *UpgradeRequest {
+	return s.upgradeRequests
 }

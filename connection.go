@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"io"
-	"net/http"
 	"sync"
 	"time"
 )
@@ -21,7 +20,6 @@ type Connection struct {
 	handlers            map[string]mapper
 	rawHandler          func(message []byte)
 	handlersLocker      sync.Mutex
-	upgradeRequest      *http.Request
 	closed              chan bool
 	attributes          map[string]interface{}
 	attributesLocker    sync.Mutex
@@ -33,7 +31,7 @@ type Connection struct {
 	encryptionFields    *encryptionFields
 }
 
-func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Request, clientID string, encryptionFields *encryptionFields) (c *Connection) {
+func newConnection(server *Server, ws *websocket.Conn, clientID string, encryptionFields *encryptionFields) (c *Connection) {
 	wr := make(chan messageType)
 
 	c = &Connection{
@@ -43,7 +41,6 @@ func newConnection(server *Server, ws *websocket.Conn, upgradeRequest *http.Requ
 		writer:           newWriter(wr, server.opts.logger),
 		handlers:         map[string]mapper{},
 		closed:           make(chan bool),
-		upgradeRequest:   upgradeRequest,
 		attributes:       map[string]interface{}{},
 		internalUpdates:  make(chan []byte),
 		clientErrors:     make(chan UpdateError),
@@ -88,10 +85,6 @@ func (c *Connection) GetAttribute(key string) (val interface{}, exists bool) {
 
 	val, exists = c.attributes[key]
 	return
-}
-
-func (c *Connection) UpgradeRequest() *http.Request {
-	return c.upgradeRequest
 }
 
 func (c *Connection) Errors() <-chan UpdateError {

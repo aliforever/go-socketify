@@ -11,7 +11,12 @@ func main() {
 	server := socketify.NewServer(socketify.ServerOptions().SetAddress(":8080").SetEndpoint("/").IgnoreCheckOrigin())
 	go server.Listen()
 
-	for client := range server.Connections() {
+	for upgradeRequest := range server.UpgradeRequests() {
+		client, err := upgradeRequest.Upgrade()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 		client.HandleRawUpdate(func(message []byte) {
 			if strings.Contains(string(message), "close") {
 				err := client.WriteUpdate("closing_connection", "closing")

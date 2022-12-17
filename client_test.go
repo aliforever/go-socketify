@@ -78,8 +78,10 @@ func TestNewClientWrite(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, _ := socketify.NewClient(tt.args.address)
-
+			got, err := socketify.NewClient(tt.args.address)
+			if err != nil {
+				panic(err)
+			}
 			var wait = make(chan bool)
 
 			var receivedErr error
@@ -99,7 +101,7 @@ func TestNewClientWrite(t *testing.T) {
 			})
 
 			go got.WriteText("Hello")
-
+			fmt.Println("waiting")
 			<-wait
 			assert.ErrorContains(t, receivedErr, "bye")
 		})
@@ -116,7 +118,11 @@ func runServer() {
 		}
 	}()
 
-	for client := range s.Connections() {
+	for upgradeRequest := range s.UpgradeRequests() {
+		client, err := upgradeRequest.Upgrade()
+		if err != nil {
+			panic(err)
+		}
 		client.HandleRawUpdate(func(message []byte) {
 			fmt.Println(string(message))
 			if string(message) == "Hello" {

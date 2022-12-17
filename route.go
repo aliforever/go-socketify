@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/aliforever/encryptionbox"
-	"github.com/teris-io/shortid"
 	"net/http"
 )
 
@@ -33,68 +32,9 @@ func (s *Server) parseRsaPublicKey(r *http.Request) (*rsa.PublicKey, error) {
 }
 
 func (s *Server) websocketUpgrade(w http.ResponseWriter, r *http.Request) {
-	var clientID string
-	var attributes map[string]interface{}
-	var err error
+	ur := newUpgradeRequest(s, w, r)
 
-	if s.opts.onConnect != nil {
-		clientID, attributes, err = s.opts.onConnect(w, r)
-		if err != nil {
-			s.opts.logger.Error("Error onConnect", err)
-			return
-		}
-	}
+	s.upgradeRequests <- ur
 
-	var ef *encryptionFields
-
-	var headers http.Header
-
-	if s.opts.encryption != nil {
-		if s.opts.encryption.Method == EncryptionTypeRsaAes && s.opts.encryption.rsaAes != nil {
-			key, err := s.parseRsaPublicKey(r)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte(err.Error()))
-				s.opts.logger.Error("Error parsing rsa public key from connection", err)
-				return
-			}
-
-			ef = &encryptionFields{
-				clientPublicKey: key,
-			}
-
-			serverPrivateKey, err := s.opts.encryption.rsaAes.privateKey()
-			if err != nil {
-				w.WriteHeader(http.StatusInternalServerError)
-				w.Write([]byte(err.Error()))
-				s.opts.logger.Error("Error getting server private key", err)
-				return
-			}
-
-			ef.serverPrivateKey = serverPrivateKey
-		}
-	}
-
-	c, err := s.upgrade.Upgrade(w, r, headers)
-	if err != nil {
-		s.opts.logger.Error("Error upgrading request", err, fmt.Sprintf("Headers: %+v", r.Header))
-		return
-	}
-
-	if clientID == "" {
-		clientID = shortid.MustGenerate()
-	}
-
-	client := newConnection(s, c, r, clientID, ef)
-	if s.storage != nil {
-		s.storage.addClient(client)
-	}
-
-	if attributes != nil {
-		for key, val := range attributes {
-			client.SetAttribute(key, val)
-		}
-	}
-
-	s.connections <- client
+	<-ur.done
 }
